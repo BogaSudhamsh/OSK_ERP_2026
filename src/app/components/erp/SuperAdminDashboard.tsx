@@ -890,7 +890,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             { label: 'Stock Inward', icon: TrendingUp, screen: 'stock-inward', color: 'from-blue-500 to-blue-600' },
             { label: 'Transfers', icon: ArrowLeftRight, screen: 'stock-transfer', color: 'from-purple-500 to-purple-600' },
             { label: 'Dealer Bills', icon: FileText, screen: 'dealer-bills', color: 'from-emerald-500 to-emerald-600' },
-            { label: 'POS Billing', icon: ShoppingCart, screen: 'pos-billing', color: 'from-teal-500 to-teal-600' },
             { label: 'Customers', icon: Users, screen: 'customers', color: 'from-amber-500 to-amber-600' },
           ].map(action => {
             const Icon = action.icon;

@@ -156,13 +156,6 @@ export const BranchAdminDashboard: React.FC<BranchAdminDashboardProps> = ({
       action: () => onNavigate('stock-inward'),
       gradient: 'from-blue-600 to-blue-700',
     },
-    {
-      title: 'POS Billing',
-      description: 'Create new invoice',
-      icon: ShoppingCart,
-      action: () => onNavigate('pos-billing'),
-      gradient: 'from-[#B8860B] to-[#DAA520]',
-    },
   ];
 
   return (

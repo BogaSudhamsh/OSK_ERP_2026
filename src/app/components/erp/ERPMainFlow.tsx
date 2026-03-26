@@ -8,7 +8,6 @@ import {
   FileText, 
   Users, 
   BarChart3, 
-  ShoppingCart, 
   LogOut,
   Menu,
   X,
@@ -21,7 +20,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
 import { StockInwardForm } from './StockInwardForm';
-import { POSBilling } from './POSBilling';
 import { BranchDetailView } from './BranchDetailView';
 import { BranchAdminDashboard } from './BranchAdminDashboard';
 import { BranchInventory } from './BranchInventory';
@@ -45,7 +43,6 @@ type ERPScreen =
   | 'stock-transfer'
   | 'dealer-bills'
   | 'purchase-orders'
-  | 'pos-billing'
   | 'branch-detail'
   | 'stock-alerts'
   | 'vendor-ledger'
@@ -117,7 +114,6 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
         { name: 'Stock Transfer',     icon: ArrowLeftRight, screen: 'stock-transfer' },
         { name: 'Dealer Bills',       icon: Wallet,      screen: 'dealer-bills' },
         { name: 'Purchase Orders',    icon: FileText,    screen: 'purchase-orders' },
-        { name: 'POS Billing',        icon: ShoppingCart, screen: 'pos-billing' },
         { name: 'Dealer Ledger',      icon: Building2,   screen: 'vendor-ledger' },
         { name: 'Reports',            icon: BarChart3,   screen: 'branch-comparison' },
         { name: 'Daily Ledger',       icon: BookOpen,    screen: 'daily-ledger' },
@@ -129,7 +125,6 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
         { name: 'Purchase Orders',  icon: FileText,    screen: 'purchase-orders' },
         { name: 'Stock Inward',     icon: TrendingUp,  screen: 'stock-inward' },
         { name: 'Stock Transfer',   icon: ArrowLeftRight, screen: 'stock-transfer' },
-        { name: 'POS Billing',      icon: ShoppingCart, screen: 'pos-billing' },
       ];
     } else {
       // Branch Admin
@@ -142,7 +137,6 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
         { name: 'Stock Inward',     icon: TrendingUp,  screen: 'stock-inward' },
         { name: 'Stock Transfer',   icon: ArrowLeftRight, screen: 'stock-transfer' },
         { name: 'Dealer Bills',     icon: Wallet,      screen: 'dealer-bills' },
-        { name: 'POS Billing',      icon: ShoppingCart, screen: 'pos-billing' },
         { name: 'Daily Ledger',     icon: BookOpen,    screen: 'daily-ledger' },
       ];
     }
@@ -216,16 +210,6 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
             branchLocation={currentUser.branchLocation || 'aziz-nagar'}
             userRole={currentUser.role as 'super-admin' | 'branch-admin' | 'stock-manager'}
           />
-        );
-
-      case 'pos-billing':
-        return (
-          <div className="w-full px-4 lg:px-6 py-6 lg:py-8">
-            <POSBilling
-              branchId={currentUser.branchId || 'branch-1'}
-              branchLocation={currentUser.branchLocation || 'aziz-nagar'}
-            />
-          </div>
         );
 
       case 'branch-detail':
