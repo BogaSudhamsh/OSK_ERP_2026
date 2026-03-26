@@ -1,12 +1,60 @@
 // ============================================================================
-// OSK Granite — Mock Firestore Service
+// OSK Granite — Firebase Firestore Service (Live SDK)
 // ============================================================================
-// localStorage-backed Firestore-like API.
-// Supports where / orderBy query constraints and real-time subscriptions.
-// All other service files import from here instead of the real firebase SDK.
+// Wraps the official Firebase SDK with the same API surface the rest of the
+// codebase uses — no changes needed in any other service file.
 // ============================================================================
 
-const STORAGE_PREFIX = 'osk_firestore_';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  onSnapshot,
+  query,
+  where as firestoreWhere,
+  orderBy as firestoreOrderBy,
+  Timestamp as FirestoreTimestamp,
+  type Firestore,
+  type QueryConstraint as FirestoreQueryConstraint,
+} from 'firebase/firestore';
+
+// ── Firebase config (from .env) ───────────────────────────────────────────────
+
+const firebaseConfig = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+
+// ── App + DB singletons ───────────────────────────────────────────────────────
+
+let _app: FirebaseApp | null = null;
+let _db: Firestore | null = null;
+
+export function getFirebaseApp(): FirebaseApp {
+  if (!_app) {
+    _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  }
+  return _app;
+}
+
+function getDB(): Firestore {
+  if (!_db) {
+    _db = getFirestore(getFirebaseApp());
+  }
+  return _db;
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,19 +72,10 @@ export interface TimestampLike {
 
 export const Timestamp = {
   now(): TimestampLike {
-    const now = new Date();
-    return {
-      toDate: () => now,
-      seconds: Math.floor(now.getTime() / 1000),
-      nanoseconds: (now.getTime() % 1000) * 1_000_000,
-    };
+    return FirestoreTimestamp.now();
   },
   fromDate(date: Date): TimestampLike {
-    return {
-      toDate: () => date,
-      seconds: Math.floor(date.getTime() / 1000),
-      nanoseconds: (date.getTime() % 1000) * 1_000_000,
-    };
+    return FirestoreTimestamp.fromDate(date);
   },
 };
 
@@ -60,25 +99,38 @@ export interface QueryConstraint {
 }
 
 // ── Collection name constants ─────────────────────────────────────────────────
+//
+// The live Firebase belongs to the CRM system which owns these collections:
+//   agents | branches | jobs | location_history | notifications | users
+//
+// From those, ERP only shares ONE: `leads` (read + write).
+//
+// To avoid colliding with the CRM's own `branches` and `notifications`,
+// the ERP uses prefixed names: erp_branches, erp_notifications.
+// All other ERP collections are net-new.
 
 export const COLLECTIONS = {
-  products: 'products',
-  dealers: 'dealers',
-  customers: 'customers',
-  orders: 'orders',
-  leads: 'leads',
-  bills: 'bills',
-  stockMovements: 'stockMovements',
-  dayBookEntries: 'dayBookEntries',
-  notifications: 'notifications',
-  transfers: 'branchTransfers',
-  stock: 'branchStock',
-  branches: 'branches',
-  productNames: 'productNames',
-  categories: 'categories',
-  sizes: 'sizes',
-  grades: 'grades',
-  itemNames: 'itemNames',
+  // ── Shared with CRM ────────────────────────────────────────────────────────
+  leads:           'leads',         // Shared with CRM — ERP reads & creates leads
+  // ── ERP users — separate from CRM users ──────────────────────────────────
+  users:           'erp_users',     // ERP staff profiles (role, branchId, etc.)
+  // ── ERP-only collections (never overlap CRM) ──────────────────────────────
+  branches:        'erp_branches',  // OSK store branches (aziz-nagar, sangareddy, vikarabad)
+  notifications:   'erp_notifications',
+  products:        'products',
+  dealers:         'dealers',
+  customers:       'customers',
+  orders:          'orders',
+  bills:           'bills',
+  stockMovements:  'stockMovements',
+  dayBookEntries:  'dayBookEntries',
+  transfers:       'branchTransfers',
+  stock:           'branchStock',
+  productNames:    'productNames',
+  categories:      'categories',
+  sizes:           'sizes',
+  grades:          'grades',
+  itemNames:       'itemNames',
 } as const;
 
 // ── Query builders ────────────────────────────────────────────────────────────
@@ -91,208 +143,114 @@ export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): Query
   return { _type: 'orderBy', field, direction };
 }
 
+// Returns an ISO string — compatible with all existing service code which
+// stores/reads timestamps as strings. Use FirestoreTimestamp on new code.
 export function serverTimestamp(): string {
   return new Date().toISOString();
 }
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
-type DocMap = Record<string, Record<string, unknown>>;
-
-function storageKey(collection: string): string {
-  return `${STORAGE_PREFIX}${collection}`;
-}
-
-function loadCollection(collection: string): DocMap {
-  try {
-    const raw = localStorage.getItem(storageKey(collection));
-    return raw ? (JSON.parse(raw) as DocMap) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveCollection(collection: string, docs: DocMap): void {
-  try {
-    localStorage.setItem(storageKey(collection), JSON.stringify(docs));
-  } catch (e) {
-    console.error(`[firebase] Failed to persist collection "${collection}":`, e);
-  }
-}
-
-// ── Subscription registry ─────────────────────────────────────────────────────
-
-type Subscriber = {
-  callback: (docs: unknown[]) => void;
-  constraints: QueryConstraint[];
-};
-
-const subscribers = new Map<string, Set<Subscriber>>();
-
-function notifySubscribers(collection: string): void {
-  const subs = subscribers.get(collection);
-  if (!subs || subs.size === 0) return;
-  const docs = loadCollection(collection);
-  for (const sub of subs) {
-    const results = applyConstraints(Object.values(docs), sub.constraints);
-    try {
-      sub.callback(results);
-    } catch (e) {
-      console.error('[firebase] Subscriber callback error:', e);
-    }
-  }
-}
-
-// ── Query application ─────────────────────────────────────────────────────────
-
-function applyConstraints(
-  docs: Record<string, unknown>[],
-  constraints: QueryConstraint[],
-): Record<string, unknown>[] {
-  let result = [...docs];
-
-  // Apply all where constraints first
-  for (const c of constraints) {
+function buildConstraints(constraints: QueryConstraint[]): FirestoreQueryConstraint[] {
+  return constraints.map((c) => {
     if (c._type === 'where' && c.field && c.op !== undefined) {
-      result = result.filter((doc) => matchesWhere(doc, c.field, c.op!, c.value));
+      return firestoreWhere(c.field, c.op as Parameters<typeof firestoreWhere>[1], c.value);
     }
-  }
-
-  // Apply orderBy constraints
-  for (const c of constraints) {
     if (c._type === 'orderBy' && c.field) {
-      const dir = c.direction === 'desc' ? -1 : 1;
-      result.sort((a, b) => {
-        const av = a[c.field];
-        const bv = b[c.field];
-        if (av === bv) return 0;
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        return av < bv ? -dir : dir;
-      });
+      return firestoreOrderBy(c.field, c.direction ?? 'asc');
     }
-  }
-
-  return result;
+    throw new Error(`[firebase] Unknown constraint: ${JSON.stringify(c)}`);
+  });
 }
 
-function matchesWhere(
-  doc: Record<string, unknown>,
-  field: string,
-  op: WhereFilterOp,
-  value: unknown,
-): boolean {
-  const docVal = doc[field];
-  switch (op) {
-    case '==': return docVal === value;
-    case '!=': return docVal !== value;
-    case '<': return (docVal as number) < (value as number);
-    case '<=': return (docVal as number) <= (value as number);
-    case '>': return (docVal as number) > (value as number);
-    case '>=': return (docVal as number) >= (value as number);
-    case 'array-contains': return Array.isArray(docVal) && docVal.includes(value);
-    case 'in': return Array.isArray(value) && (value as unknown[]).includes(docVal);
-    case 'not-in': return Array.isArray(value) && !(value as unknown[]).includes(docVal);
-    default: return true;
-  }
+// Normalise a Firestore document snapshot into a plain object.
+// Firestore Timestamps are kept as-is (they implement TimestampLike via .toDate()).
+function normalizeDoc(id: string, data: Record<string, unknown>): Record<string, unknown> {
+  return { ...data, id };
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function fetchCollection<T = Record<string, unknown>>(
-  collection: string,
+  collectionName: string,
   ...constraints: QueryConstraint[]
 ): Promise<T[]> {
-  const docs = loadCollection(collection);
-  return applyConstraints(Object.values(docs), constraints) as T[];
+  const colRef = collection(getDB(), collectionName);
+  const q = constraints.length > 0
+    ? query(colRef, ...buildConstraints(constraints))
+    : query(colRef);
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => normalizeDoc(d.id, d.data() as Record<string, unknown>) as T);
 }
 
 export async function fetchDoc<T = Record<string, unknown>>(
-  collection: string,
+  collectionName: string,
   id: string,
 ): Promise<T | null> {
-  const docs = loadCollection(collection);
-  return (docs[id] as T) ?? null;
+  const snap = await getDoc(doc(getDB(), collectionName, id));
+  if (!snap.exists()) return null;
+  return normalizeDoc(snap.id, snap.data() as Record<string, unknown>) as T;
 }
 
 export async function setDocument(
-  collection: string,
+  collectionName: string,
   id: string,
   data: Record<string, unknown>,
   merge = true,
 ): Promise<void> {
-  const docs = loadCollection(collection);
-  const existing = merge ? (docs[id] ?? {}) : {};
-  docs[id] = { ...existing, ...data, id };
-  saveCollection(collection, docs);
-  notifySubscribers(collection);
+  const { id: _id, ...payload } = data;
+  await setDoc(doc(getDB(), collectionName, id), payload, { merge });
 }
 
 export async function updateDocument(
-  collection: string,
+  collectionName: string,
   id: string,
   updates: Record<string, unknown>,
 ): Promise<void> {
-  const docs = loadCollection(collection);
-  if (docs[id]) {
-    docs[id] = { ...docs[id], ...updates, id };
-    saveCollection(collection, docs);
-    notifySubscribers(collection);
-  }
+  const { id: _id, ...payload } = updates;
+  await updateDoc(doc(getDB(), collectionName, id), payload);
 }
 
 export async function deleteDocument(
-  collection: string,
+  collectionName: string,
   id: string,
 ): Promise<void> {
-  const docs = loadCollection(collection);
-  if (docs[id]) {
-    delete docs[id];
-    saveCollection(collection, docs);
-    notifySubscribers(collection);
-  }
+  await deleteDoc(doc(getDB(), collectionName, id));
 }
 
 export async function createDoc(
-  collection: string,
+  collectionName: string,
   data: Record<string, unknown>,
 ): Promise<string> {
-  const id = generateId();
-  await setDocument(collection, id, { ...data, id }, false);
-  return id;
+  const { id: _id, ...payload } = data;
+  const ref = await addDoc(collection(getDB(), collectionName), payload);
+  // Write the generated id back so documents self-reference their own id
+  await updateDoc(ref, { id: ref.id });
+  return ref.id;
 }
 
 export function subscribeToCollection<T = Record<string, unknown>>(
-  collection: string,
+  collectionName: string,
   callback: (docs: T[]) => void,
   ...constraints: QueryConstraint[]
 ): () => void {
-  const sub: Subscriber = {
-    callback: callback as (docs: unknown[]) => void,
-    constraints,
-  };
+  const colRef = collection(getDB(), collectionName);
+  const q = constraints.length > 0
+    ? query(colRef, ...buildConstraints(constraints))
+    : query(colRef);
 
-  if (!subscribers.has(collection)) {
-    subscribers.set(collection, new Set());
-  }
-  subscribers.get(collection)!.add(sub);
-
-  // Immediately invoke with current data
-  const docs = loadCollection(collection);
-  const results = applyConstraints(Object.values(docs), constraints) as T[];
-  try {
-    callback(results);
-  } catch (e) {
-    console.error('[firebase] Initial subscription error:', e);
-  }
-
-  return () => {
-    subscribers.get(collection)?.delete(sub);
-  };
-}
-
-// ── Utility ───────────────────────────────────────────────────────────────────
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  return onSnapshot(
+    q,
+    (snap) => {
+      const docs = snap.docs.map(
+        (d) => normalizeDoc(d.id, d.data() as Record<string, unknown>) as T,
+      );
+      try {
+        callback(docs);
+      } catch (e) {
+        console.error(`[firebase] Subscriber error (${collectionName}):`, e);
+      }
+    },
+    (err) => console.error(`[firebase] onSnapshot error (${collectionName}):`, err),
+  );
 }

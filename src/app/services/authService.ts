@@ -1,56 +1,50 @@
 // ============================================================================
-// OSK Granite — Mock Authentication Service
+// OSK Granite — Firebase Authentication Service (Live SDK)
+// ============================================================================
+// Uses Firebase Auth for sign-in / sign-out, then reads the user profile
+// document from the `erp_users` Firestore collection (keyed by auth UID).
+// ERP has its own user profiles — completely separate from the CRM `users` collection.
 // ============================================================================
 
-import { type FirebaseUser } from '@/app/services/firebase';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  type Auth,
+} from 'firebase/auth';
+import { getFirebaseApp, fetchDoc, COLLECTIONS, type FirebaseUser } from '@/app/services/firebase';
 import type { User } from '@/app/types';
 
-const SESSION_STORAGE_KEY = 'osk-mock-auth-user';
-const MOCK_PASSWORDS = new Set(['password', 'admin123', '123456']);
-let currentMockUser: User | null = null;
-const authListeners = new Set<(user: User | null) => void>();
+// ── Auth singleton ────────────────────────────────────────────────────────────
 
-function cloneUser(user: User): User {
+function getFirebaseAuth(): Auth {
+  return getAuth(getFirebaseApp());
+}
+
+// ── User profile helpers ──────────────────────────────────────────────────────
+
+/** Map a raw Firestore `erp_users` doc to the app's User type. */
+function buildUser(uid: string, doc: Record<string, any>): User {
   return {
-    ...user,
-    createdAt: new Date(user.createdAt),
+    id:             uid,
+    email:          doc.email          ?? '',
+    name:           doc.name           ?? doc.displayName ?? (doc.email as string | undefined)?.split('@')[0] ?? uid,
+    role:           doc.role           ?? 'store-staff',
+    branchId:       doc.branchId,
+    branchLocation: doc.branchLocation,
+    createdAt:      doc.createdAt ? new Date(doc.createdAt) : new Date(),
   };
 }
 
-function createMockUser(
-  id: string,
-  email: string,
-  name: string,
-  role: User['role'],
-  branchId?: string,
-  branchLocation?: User['branchLocation'],
-): User {
-  return {
-    id,
-    email,
-    name,
-    role,
-    branchId,
-    branchLocation,
-    createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  };
+async function fetchUserProfile(uid: string): Promise<User | null> {
+  const raw = await fetchDoc<Record<string, any>>(COLLECTIONS.users, uid);
+  if (raw) return buildUser(uid, raw);
+  return null;
 }
 
-const MOCK_USERS: Record<string, User> = {
-  'admin@oskgranite.com': createMockUser('mock-super-admin', 'admin@oskgranite.com', 'Super Admin', 'super-admin', 'aziz-nagar', 'aziz-nagar'),
-  'inventory@oskgranite.com': createMockUser('mock-inventory', 'inventory@oskgranite.com', 'Inventory Manager', 'inventory-manager'),
-  'sales@oskgranite.com': createMockUser('mock-sales', 'sales@oskgranite.com', 'Sales Manager', 'sales-manager', 'aziz-nagar', 'aziz-nagar'),
-  'aziz@oskgranite.com': createMockUser('mock-aziz-admin', 'aziz@oskgranite.com', 'Aziz Nagar Branch Admin', 'branch-admin', 'aziz-nagar', 'aziz-nagar'),
-  'aziz-stock@oskgranite.com': createMockUser('mock-aziz-stock', 'aziz-stock@oskgranite.com', 'Aziz Nagar Stock Manager', 'stock-manager', 'aziz-nagar', 'aziz-nagar'),
-  'aziz-store@oskgranite.com': createMockUser('mock-aziz-store', 'aziz-store@oskgranite.com', 'Aziz Nagar Store', 'store', 'aziz-nagar', 'aziz-nagar'),
-  'store@oskgranite.com': createMockUser('mock-store', 'store@oskgranite.com', 'Main Store', 'store', 'aziz-nagar', 'aziz-nagar'),
-  'sangareddy@oskgranite.com': createMockUser('mock-sang-admin', 'sangareddy@oskgranite.com', 'Sangareddy Branch Admin', 'branch-admin', 'sangareddy', 'sangareddy'),
-  'sangareddy-stock@oskgranite.com': createMockUser('mock-sang-stock', 'sangareddy-stock@oskgranite.com', 'Sangareddy Stock Manager', 'stock-manager', 'sangareddy', 'sangareddy'),
-  'sangareddy-store@oskgranite.com': createMockUser('mock-sang-store', 'sangareddy-store@oskgranite.com', 'Sangareddy Store', 'store', 'sangareddy', 'sangareddy'),
-  'vikarabad@oskgranite.com': createMockUser('mock-vika-admin', 'vikarabad@oskgranite.com', 'Vikarabad Branch Admin', 'branch-admin', 'vikarabad', 'vikarabad'),
-  'vikarabad-stock@oskgranite.com': createMockUser('mock-vika-stock', 'vikarabad-stock@oskgranite.com', 'Vikarabad Stock Manager', 'stock-manager', 'vikarabad', 'vikarabad'),
-  'vikarabad-store@oskgranite.com': createMockUser('mock-vika-store', 'vikarabad-store@oskgranite.com', 'Vikarabad Store', 'store', 'vikarabad', 'vikarabad'),
-};
+// ── Public types ──────────────────────────────────────────────────────────────
 
 export interface AuthResult {
   success: boolean;
@@ -58,128 +52,110 @@ export interface AuthResult {
   error?: string;
 }
 
+// ── Error messages ────────────────────────────────────────────────────────────
+
 function getAuthErrorMessage(code: string): string {
   switch (code) {
     case 'auth/invalid-email':
       return 'Invalid email address format.';
     case 'auth/user-not-found':
-      return 'No account found with this email address.';
-    case 'auth/mock-password-required':
-      return 'Use one of the demo passwords: password, admin123, or 123456.';
+    case 'auth/invalid-credential':
+      return 'No account found with this email or the password is incorrect.';
+    case 'auth/wrong-password':
+      return 'Incorrect password. Please try again.';
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later.';
+    case 'auth/network-request-failed':
+      return 'Network error. Check your internet connection.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Contact your administrator.';
     default:
       return 'Authentication failed. Please try again.';
   }
 }
 
-function persistSession(user: User | null): void {
-  if (typeof window === 'undefined') return;
-  if (!user) {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    return;
-  }
-
-  window.localStorage.setItem(
-    SESSION_STORAGE_KEY,
-    JSON.stringify({
-      ...user,
-      createdAt: user.createdAt.toISOString(),
-    }),
-  );
-}
-
-function restoreSession(): User | null {
-  if (typeof window === 'undefined') return null;
-
-  const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
-  if (!stored) return null;
-
-  try {
-    const parsed = JSON.parse(stored) as Omit<User, 'createdAt'> & { createdAt: string };
-    return {
-      ...parsed,
-      createdAt: new Date(parsed.createdAt),
-    };
-  } catch {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    return null;
-  }
-}
-
-function setCurrentMockUser(user: User | null): void {
-  currentMockUser = user ? cloneUser(user) : null;
-  persistSession(currentMockUser);
-  authListeners.forEach((listener) => listener(currentMockUser ? cloneUser(currentMockUser) : null));
-}
+// ── Sign in ───────────────────────────────────────────────────────────────────
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
-  const normalizedEmail = email.trim().toLowerCase();
+  try {
+    const credential = await signInWithEmailAndPassword(
+      getFirebaseAuth(),
+      email.trim().toLowerCase(),
+      password,
+    );
 
-  if (!normalizedEmail.includes('@')) {
-    return {
-      success: false,
-      user: null,
-      error: getAuthErrorMessage('auth/invalid-email'),
+    const { uid } = credential.user;
+    const profile = await fetchUserProfile(uid);
+
+    // If no profile doc exists yet, build a minimal one from Auth data
+    const user: User = profile ?? {
+      id:        uid,
+      email:     credential.user.email ?? email.trim().toLowerCase(),
+      name:      credential.user.displayName ?? email.split('@')[0],
+      role:      'store-staff',
+      createdAt: new Date(),
     };
-  }
 
-  if (!MOCK_PASSWORDS.has(password.trim())) {
-    return {
-      success: false,
-      user: null,
-      error: getAuthErrorMessage('auth/mock-password-required'),
-    };
+    return { success: true, user };
+  } catch (err: any) {
+    return { success: false, user: null, error: getAuthErrorMessage(err?.code ?? '') };
   }
-
-  const user = MOCK_USERS[normalizedEmail];
-  if (!user) {
-    return {
-      success: false,
-      user: null,
-      error: getAuthErrorMessage('auth/user-not-found'),
-    };
-  }
-
-  setCurrentMockUser(user);
-  return { success: true, user: cloneUser(user) };
 }
+
+// ── Sign out ──────────────────────────────────────────────────────────────────
 
 export async function signOutUser(): Promise<void> {
-  setCurrentMockUser(null);
+  await signOut(getFirebaseAuth());
 }
 
+// ── Password reset ────────────────────────────────────────────────────────────
+
 export async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!MOCK_USERS[normalizedEmail]) {
-    return { success: false, error: getAuthErrorMessage('auth/user-not-found') };
+  try {
+    await sendPasswordResetEmail(getFirebaseAuth(), email.trim().toLowerCase());
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: getAuthErrorMessage(err?.code ?? '') };
   }
-  return { success: true };
 }
+
+// ── Auth state subscription ───────────────────────────────────────────────────
 
 export function subscribeToAuthState(
   callback: (user: User | null) => void,
   onLoading?: (loading: boolean) => void,
 ): () => void {
-  const restored = restoreSession();
-  if (restored) {
-    currentMockUser = restored;
-  }
-
-  authListeners.add(callback);
   onLoading?.(true);
-  queueMicrotask(() => {
-    callback(currentMockUser ? cloneUser(currentMockUser) : null);
+
+  const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (firebaseUser) => {
+    if (!firebaseUser) {
+      onLoading?.(false);
+      callback(null);
+      return;
+    }
+
+    const profile = await fetchUserProfile(firebaseUser.uid);
+    const user: User = profile ?? {
+      id:        firebaseUser.uid,
+      email:     firebaseUser.email ?? '',
+      name:      firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
+      role:      'store-staff',
+      createdAt: new Date(),
+    };
+
     onLoading?.(false);
+    callback(user);
   });
 
-  return () => {
-    authListeners.delete(callback);
-  };
+  return unsubscribe;
 }
 
+// ── Current user helper ───────────────────────────────────────────────────────
+
 export function getCurrentFirebaseUser(): FirebaseUser | null {
-  if (!currentMockUser) return null;
-  return {
-    uid: currentMockUser.id,
-    email: currentMockUser.email,
-  };
+  const u = getFirebaseAuth().currentUser;
+  if (!u) return null;
+  return { uid: u.uid, email: u.email, displayName: u.displayName };
 }
+
+

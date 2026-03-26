@@ -1,0 +1,243 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // CRM RULES — do not modify, owned by CRM system
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isAdminSafe() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function userExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // CRM — users
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdminSafe());
+      allow update: if isAuthenticated() && (isOwner(userId) || (userExists(request.auth.uid) && isAdmin()));
+      allow delete: if userExists(request.auth.uid) && isAdmin();
+    }
+
+    // CRM — leads (also readable/writable by ERP via isAuthenticated())
+    match /leads/{leadId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+    }
+
+    // CRM — agents
+    match /agents/{agentId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+    }
+
+    // CRM — branches
+    match /branches/{branchId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+    }
+
+    // CRM — locations
+    match /locations/{locationId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // CRM — whatsappTemplates
+    match /whatsappTemplates/{templateId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+    }
+
+    // CRM — commissions
+    match /commissions/{commissionId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // CRM — reports
+    match /reports/{reportId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // CRM — notifications
+    match /notifications/{notificationId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // CRM — jobs
+    match /jobs/{jobId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (userExists(request.auth.uid) && isAdmin());
+    }
+
+    // CRM — location_history
+    match /location_history/{agentName}/dates/{date} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // ERP RULES — OSK Granite ERP (all collections prefixed erp_ or unique)
+    // =========================================================================
+
+    // ERP helper functions (use erp_users, not CRM users)
+    function erpUserDoc() {
+      return get(/databases/$(database)/documents/erp_users/$(request.auth.uid)).data;
+    }
+
+    function erpRole() {
+      // Returns null safely if erp_users doc doesn't exist yet (bootstrap)
+      return exists(/databases/$(database)/documents/erp_users/$(request.auth.uid))
+        ? erpUserDoc().role : null;
+    }
+
+    function isErpSuperAdmin() {
+      return isAuthenticated() && erpRole() == 'super-admin';
+    }
+
+    function isErpInventoryManager() {
+      return isAuthenticated() && erpRole() == 'inventory-manager';
+    }
+
+    function isErpBranchAdmin() {
+      return isAuthenticated() && erpRole() == 'branch-admin';
+    }
+
+    function isErpStockManager() {
+      return isAuthenticated() && erpRole() == 'stock-manager';
+    }
+
+    function isErpSalesRole() {
+      return isAuthenticated() && erpRole() in ['sales-manager', 'store', 'cashier', 'store-staff', 'store-manager'];
+    }
+
+    // ERP — erp_users (staff profiles)
+    match /erp_users/{userId} {
+      allow read:   if isAuthenticated() && (request.auth.uid == userId || isErpSuperAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId; // bootstrap self-create
+      allow update: if isErpSuperAdmin();
+      allow delete: if isErpSuperAdmin();
+    }
+
+    // ERP — erp_branches
+    match /erp_branches/{branchId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin();
+    }
+
+    // ERP — erp_notifications
+    match /erp_notifications/{notifId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpBranchAdmin() || isErpInventoryManager();
+    }
+
+    // ERP — products
+    match /products/{productId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpInventoryManager();
+    }
+
+    // ERP — dealers
+    match /dealers/{dealerId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpInventoryManager();
+    }
+
+    // ERP — customers
+    match /customers/{customerId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpBranchAdmin() || isErpSalesRole();
+    }
+
+    // ERP — orders
+    match /orders/{orderId} {
+      allow read:   if isAuthenticated();
+      allow create: if isErpSuperAdmin() || isErpBranchAdmin() || isErpSalesRole();
+      allow update: if isErpSuperAdmin() || isErpBranchAdmin() || isErpSalesRole();
+      allow delete: if isErpSuperAdmin();
+    }
+
+    // ERP — bills
+    match /bills/{billId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpInventoryManager() || isErpBranchAdmin();
+    }
+
+    // ERP — stockMovements
+    match /stockMovements/{docId} {
+      allow read:          if isAuthenticated();
+      allow create:        if isAuthenticated();
+      allow update, delete: if isErpSuperAdmin();
+    }
+
+    // ERP — dayBookEntries
+    match /dayBookEntries/{docId} {
+      allow read:   if isAuthenticated();
+      allow create: if isErpSuperAdmin() || isErpBranchAdmin() || isErpSalesRole();
+      allow update: if isErpSuperAdmin() || isErpBranchAdmin();
+      allow delete: if isErpSuperAdmin();
+    }
+
+    // ERP — branchTransfers
+    match /branchTransfers/{docId} {
+      allow read:   if isAuthenticated();
+      allow create: if isErpSuperAdmin() || isErpBranchAdmin() || isErpStockManager() || isErpInventoryManager();
+      allow update: if isErpSuperAdmin() || isErpBranchAdmin() || isErpInventoryManager();
+      allow delete: if isErpSuperAdmin();
+    }
+
+    // ERP — branchStock
+    match /branchStock/{docId} {
+      allow read:  if isAuthenticated();
+      allow write: if isErpSuperAdmin() || isErpInventoryManager() || isErpStockManager() || isErpBranchAdmin();
+    }
+
+    // ERP — lookup collections
+    match /productNames/{docId} { allow read: if isAuthenticated(); allow write: if isErpSuperAdmin() || isErpInventoryManager(); }
+    match /categories/{docId}   { allow read: if isAuthenticated(); allow write: if isErpSuperAdmin() || isErpInventoryManager(); }
+    match /sizes/{docId}        { allow read: if isAuthenticated(); allow write: if isErpSuperAdmin() || isErpInventoryManager(); }
+    match /grades/{docId}       { allow read: if isAuthenticated(); allow write: if isErpSuperAdmin() || isErpInventoryManager(); }
+    match /itemNames/{docId}    { allow read: if isAuthenticated(); allow write: if isErpSuperAdmin() || isErpInventoryManager(); }
+  }
+}
+
