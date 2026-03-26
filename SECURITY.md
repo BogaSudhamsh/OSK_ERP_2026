@@ -1,27 +1,35 @@
-# OSK Granite ERP - Security Notes
+# Security Policy
 
-## Overview
+## Supported Versions
 
-This repository contains client-side security utilities in `src/app/services/securityService.ts` for:
+The following table indicates which versions are currently supported with security updates.
 
-- input validation and sanitization
-- data masking for sensitive fields
-- role and branch access helpers
-- session timeout utilities
-- audit log shaping in the client
+| Version | Supported |
+| ------- | --------- |
+| main    | :white_check_mark: |
+| older branches/tags | :x: |
 
-## Backend Status
+## Reporting a Vulnerability
 
-- The previous Firebase authentication, Firestore rules, seed scripts, and deployment scaffolding have been removed from this repository.
-- Authentication, authorization, and persistence enforcement must be implemented in the backend you connect next.
+If you discover a security vulnerability, please report it responsibly.
 
-## Important
+1. Do not open a public GitHub issue for security vulnerabilities.
+2. Use GitHub's private vulnerability reporting for this repository:
+   - Go to the repository's **Security** tab.
+   - Use **Report a vulnerability** to submit details privately.
+3. Include as much detail as possible:
+   - Affected area or file/module
+   - Steps to reproduce
+   - Potential impact
+   - Suggested fix (if available)
 
-- Client-side validation improves UX, but it is not a security boundary.
-- Any replacement backend should enforce authentication, authorization, rate limits, and data access rules server-side.
+## Response Expectations
 
-## Relevant Files
+- Initial acknowledgment: within 3 business days
+- Triage and validation: within 7 business days
+- Fix timeline: depends on severity and scope
 
-- `src/app/services/securityService.ts`
-- `src/app/components/auth/AuthGuard.tsx`
-- `src/app/utils/permissions.ts`
+## Disclosure
+
+Please allow time for investigation and remediation before public disclosure.
+After a fix is released, coordinated disclosure is welcome.
