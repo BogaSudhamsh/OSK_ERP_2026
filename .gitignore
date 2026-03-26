@@ -5,3 +5,4 @@
 
 # Keep template env file tracked
 !.env.example
+node_modules

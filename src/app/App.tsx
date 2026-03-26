@@ -27,12 +27,6 @@ import { IncomingOrders } from '@/app/components/inventory/IncomingOrders';
 import { TransportInvoice } from '@/app/components/inventory/TransportInvoice';
 import { InventoryLedger } from '@/app/components/inventory/InventoryLedger';
 
-// Sales/Marketing Role Components
-import { LeadManagement } from '@/app/components/sales/LeadManagement';
-import { LeadsDashboard } from '@/app/components/sales/LeadsDashboard';
-import { LeadDetails } from '@/app/components/sales/LeadDetails';
-import { IVRCall } from '@/app/components/sales/IVRCall';
-
 // ERP Components (NEW)
 import { ERPMainFlow } from '@/app/components/erp/ERPMainFlow';
 
@@ -150,42 +144,6 @@ const InventoryPortal: React.FC = () => {
   return <InventoryMainFlow />;
 };
 
-const SalesPortal: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState('Dashboard');
-  const [selectedLeadId, setSelectedLeadId] = useState<string>('');
-
-  const navigation = [
-    { name: 'Dashboard', icon: Home, onClick: () => setCurrentPage('Dashboard') },
-    { name: 'Leads', icon: Users, onClick: () => setCurrentPage('Leads') },
-  ];
-
-  const handleNavigate = (page: string, leadId?: string) => {
-    setCurrentPage(page);
-    if (leadId) setSelectedLeadId(leadId);
-  };
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'Dashboard':
-        return <LeadsDashboard onNavigate={handleNavigate} />;
-      case 'Leads':
-        return <LeadManagement />;
-      case 'Lead Details':
-        return <LeadDetails leadId={selectedLeadId} onBack={() => setCurrentPage('Dashboard')} onNavigate={handleNavigate} />;
-      case 'IVR Call':
-        return <IVRCall leadId={selectedLeadId} onBack={() => setCurrentPage('Lead Details')} />;
-      default:
-        return <LeadsDashboard onNavigate={handleNavigate} />;
-    }
-  };
-
-  return (
-    <Layout navigation={navigation} currentPage={currentPage}>
-      {renderPage()}
-    </Layout>
-  );
-};
-
 const ERPPortal: React.FC = () => {
   // Use the new ERPMainFlow which handles all navigation internally
   return <ERPMainFlow userId="super-admin-1" />;
@@ -281,9 +239,6 @@ const MainAppContent: React.FC = () => {
     case 'inventory':
     case 'inventory-manager':
       return <InventoryPortal />;
-    case 'sales':
-    case 'sales-manager':
-      return <SalesPortal />;
     default:
       return <LoginPage />;
   }
