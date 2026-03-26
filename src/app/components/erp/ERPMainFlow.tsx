@@ -16,6 +16,8 @@ import {
   ArrowLeftRight,
   BookOpen,
   Boxes,
+  Bell,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
@@ -54,6 +56,122 @@ type ERPScreen =
 interface ERPMainFlowProps {
   userId: string;
 }
+
+// ── Stock Alerts Screen ──────────────────────────────────────────────────────
+const StockAlertsScreen: React.FC<{
+  branchId?: string;
+  branchLocation?: string;
+  isSuperAdmin: boolean;
+}> = ({ branchId, branchLocation, isSuperAdmin }) => {
+  const { branchStock } = useApp();
+  const LOW_STOCK_THRESHOLD = 10;
+
+  const alertItems = branchStock
+    .filter(item => {
+      const threshold = item.minQuantity ?? LOW_STOCK_THRESHOLD;
+      if (item.freshQuantity > threshold) return false;
+      if (!isSuperAdmin && item.branchId !== branchId) return false;
+      return true;
+    })
+    .sort((a, b) => a.freshQuantity - b.freshQuantity);
+
+  const getBranchLabel = (loc: string) =>
+    loc.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+  const grouped = alertItems.reduce<Record<string, typeof alertItems>>((acc, item) => {
+    const key = item.branchLocation;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const getSeverity = (qty: number, threshold: number) => {
+    if (qty === 0) return { label: 'Out of Stock', color: 'border-red-400 text-red-600' };
+    if (qty <= Math.ceil(threshold / 2)) return { label: 'Critical', color: 'border-orange-400 text-orange-600' };
+    return { label: 'Low Stock', color: 'border-yellow-400 text-yellow-600' };
+  };
+
+  return (
+    <div className="w-full px-4 lg:px-6 py-6 lg:py-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+          <Bell className="w-5 h-5 text-amber-600" />
+        </div>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-gray-900">Stock Alerts</h1>
+          <p className="text-sm text-gray-500">Items below minimum quantity threshold</p>
+        </div>
+        {alertItems.length > 0 && (
+          <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold">
+            {alertItems.length} Alert{alertItems.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {alertItems.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+            <AlertTriangle className="w-8 h-8 text-green-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-1">All Stock Levels Healthy</h3>
+          <p className="text-gray-400 text-sm">No items are below their minimum quantity threshold.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {Object.entries(grouped).map(([loc, items]) => (
+            <div key={loc}>
+              {isSuperAdmin && (
+                <h2 className="text-sm font-semibold text-[#B8860B] uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  {getBranchLabel(loc)}
+                  <span className="text-xs font-normal text-gray-400 normal-case">({items.length} items)</span>
+                </h2>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {items.map(item => {
+                  const threshold = item.minQuantity ?? LOW_STOCK_THRESHOLD;
+                  const sev = getSeverity(item.freshQuantity, threshold);
+                  return (
+                    <div key={item.id} className={`rounded-xl border-2 bg-white shadow-sm p-4 ${sev.color}`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="font-semibold text-gray-900 truncate">{item.productName}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {item.category}{item.size ? ` · ${item.size}` : ''}{item.grade ? ` · ${item.grade}` : ''}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${sev.color}`}>
+                          {sev.label}
+                        </span>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-3xl font-bold text-gray-900">{item.freshQuantity}</p>
+                          <p className="text-xs text-gray-400">Available qty</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Min: <span className="font-semibold text-gray-700">{threshold}</span></p>
+                          {item.rackLocation && (
+                            <p className="text-xs text-gray-400">Rack {item.rackLocation}</p>
+                          )}
+                        </div>
+                      </div>
+                      {isSuperAdmin && (
+                        <p className="mt-2 text-xs text-gray-400 border-t border-gray-100 pt-2">
+                          {getBranchLabel(item.branchLocation)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ROLE_LABEL: Record<string, string> = {
   'super-admin':   'Super Admin',
@@ -110,6 +228,7 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
       return [
         { name: 'Dashboard',          icon: Home,        screen: 'super-admin-dashboard' },
         { name: 'Customers',          icon: Users,       screen: 'customers' },
+        { name: 'Stock Alerts',       icon: Bell,        screen: 'stock-alerts' },
         { name: 'Stock Inward',       icon: TrendingUp,  screen: 'stock-inward' },
         { name: 'Stock Transfer',     icon: ArrowLeftRight, screen: 'stock-transfer' },
         { name: 'Dealer Bills',       icon: Wallet,      screen: 'dealer-bills' },
@@ -131,6 +250,7 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
       return [
         { name: 'Dashboard',        icon: Home,        screen: 'branch-dashboard' },
         { name: 'Inventory',        icon: Boxes,       screen: 'branch-inventory' },
+        { name: 'Stock Alerts',     icon: Bell,        screen: 'stock-alerts' },
         { name: 'Store Dashboard',  icon: Package,     screen: 'store-dashboard' },
         { name: 'Customers',        icon: Users,       screen: 'customers' },
         { name: 'Purchase Orders',  icon: FileText,    screen: 'purchase-orders' },
@@ -229,13 +349,11 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
 
       case 'stock-alerts':
         return (
-          <div className="p-8">
-            <h1 className="text-2xl font-bold">Stock Alerts</h1>
-            <p className="text-gray-600 mt-2">This feature is coming soon...</p>
-            <Button onClick={() => setCurrentScreen('super-admin-dashboard')} className="mt-4">
-              Back to Dashboard
-            </Button>
-          </div>
+          <StockAlertsScreen
+            branchId={currentUser.branchId}
+            branchLocation={currentUser.branchLocation}
+            isSuperAdmin={currentUser.role === 'super-admin'}
+          />
         );
 
       case 'branch-comparison':
