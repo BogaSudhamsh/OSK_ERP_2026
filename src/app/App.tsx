@@ -20,7 +20,6 @@ import { TextureApplyGenerator } from '@/app/components/store/TextureApplyGenera
 import { ProductManagement } from '@/app/components/inventory/ProductManagement';
 import { StockTracking } from '@/app/components/inventory/StockTracking';
 import { DealerManagement } from '@/app/components/inventory/DealerManagement';
-import { InventoryDashboard } from '@/app/components/inventory/InventoryDashboard';
 import { InventoryMainFlow } from '@/app/components/inventory/InventoryMainFlow';
 import { AddStock } from '@/app/components/inventory/AddStock';
 import { IncomingOrders } from '@/app/components/inventory/IncomingOrders';
