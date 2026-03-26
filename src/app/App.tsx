@@ -17,19 +17,13 @@ import { CustomerDetail } from '@/app/components/store/CustomerDetail';
 import { TextureApplyGenerator } from '@/app/components/store/TextureApplyGenerator';
 
 // Inventory Role Components
-import { ProductManagement } from '@/app/components/inventory/ProductManagement';
-import { StockTracking } from '@/app/components/inventory/StockTracking';
-import { DealerManagement } from '@/app/components/inventory/DealerManagement';
 import { InventoryMainFlow } from '@/app/components/inventory/InventoryMainFlow';
-import { AddStock } from '@/app/components/inventory/AddStock';
-import { IncomingOrders } from '@/app/components/inventory/IncomingOrders';
-import { TransportInvoice } from '@/app/components/inventory/TransportInvoice';
-import { InventoryLedger } from '@/app/components/inventory/InventoryLedger';
 
-// ERP Components (NEW)
+// ERP Components
 import { ERPMainFlow } from '@/app/components/erp/ERPMainFlow';
+import { AuthGuard } from '@/app/components/auth/AuthGuard';
 
-import { Users, Package, ShoppingCart as CartIcon, BarChart3, TrendingUp, Warehouse, PhoneCall, Home, FileText, Wand2 } from 'lucide-react';
+import { Users, Package, ShoppingCart as CartIcon, Home, FileText, Wand2 } from 'lucide-react';
 
 import oskLogo from '@/assets/356d3a3460dadc43b90004f966e6aa635e39adc6.png';
 
@@ -230,14 +224,25 @@ const MainAppContent: React.FC = () => {
     case 'super-admin':
     case 'branch-admin':
     case 'stock-manager':
-      return <ERPMainFlow userId={currentUser.id} />;
+      return (
+        <AuthGuard requiredRoles={['super-admin', 'branch-admin', 'stock-manager']}>
+          <ERPMainFlow userId={currentUser.id} />
+        </AuthGuard>
+      );
     case 'store-manager':
-      return <StorePortal />;
     case 'store':
-      return <StorePortal />;
+      return (
+        <AuthGuard requiredRoles={['store-manager', 'store']} requiredBranchId={currentUser.branchId}>
+          <StorePortal />
+        </AuthGuard>
+      );
     case 'inventory':
     case 'inventory-manager':
-      return <InventoryPortal />;
+      return (
+        <AuthGuard requiredRoles={['inventory', 'inventory-manager']}>
+          <InventoryPortal />
+        </AuthGuard>
+      );
     default:
       return <LoginPage />;
   }
