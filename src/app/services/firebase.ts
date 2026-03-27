@@ -170,6 +170,12 @@ function normalizeDoc(id: string, data: Record<string, unknown>): Record<string,
   return { ...data, id };
 }
 
+function stripId(data: object): Record<string, unknown> {
+  const payload = data as Record<string, unknown>;
+  const { id: _id, ...rest } = payload;
+  return rest;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function fetchCollection<T = Record<string, unknown>>(
@@ -196,19 +202,19 @@ export async function fetchDoc<T = Record<string, unknown>>(
 export async function setDocument(
   collectionName: string,
   id: string,
-  data: Record<string, unknown>,
+  data: object,
   merge = true,
 ): Promise<void> {
-  const { id: _id, ...payload } = data;
+  const payload = stripId(data);
   await setDoc(doc(getDB(), collectionName, id), payload, { merge });
 }
 
 export async function updateDocument(
   collectionName: string,
   id: string,
-  updates: Record<string, unknown>,
+  updates: object,
 ): Promise<void> {
-  const { id: _id, ...payload } = updates;
+  const payload = stripId(updates);
   await updateDoc(doc(getDB(), collectionName, id), payload);
 }
 
@@ -221,9 +227,9 @@ export async function deleteDocument(
 
 export async function createDoc(
   collectionName: string,
-  data: Record<string, unknown>,
+  data: object,
 ): Promise<string> {
-  const { id: _id, ...payload } = data;
+  const payload = stripId(data);
   const ref = await addDoc(collection(getDB(), collectionName), payload);
   // Write the generated id back so documents self-reference their own id
   await updateDoc(ref, { id: ref.id });
@@ -260,10 +266,10 @@ export function subscribeToCollection<T = Record<string, unknown>>(
 
 export async function callFunction<T = unknown>(
   name: string,
-  data: Record<string, unknown>,
+  data: object,
 ): Promise<T> {
   const functions = getFunctions(getFirebaseApp());
-  const fn = httpsCallable<Record<string, unknown>, T>(functions, name);
+  const fn = httpsCallable<object, T>(functions, name);
   const result = await fn(data);
   return result.data;
 }

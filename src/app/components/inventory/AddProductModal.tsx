@@ -5,11 +5,6 @@ import {
   subscribeToLookupItems,
   addLookupItem,
   deleteLookupItem,
-  DEFAULT_PRODUCT_NAMES,
-  DEFAULT_CATEGORIES,
-  DEFAULT_SIZES,
-  DEFAULT_GRADES,
-  DEFAULT_ITEM_NAMES,
 } from '@/app/services/lookupService';
 import type { LookupItem, LookupCollectionName } from '@/app/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
@@ -149,16 +144,6 @@ interface AddProductModalProps {
   onClose: () => void;
 }
 
-// Helper: convert string[] defaults to LookupItem[] for initial state
-function defaultsToLookupItems(defaults: string[]): LookupItem[] {
-  return defaults.map((name, i) => ({
-    id: `default-${i}`,
-    name,
-    enabled: true,
-    sortOrder: i,
-  }));
-}
-
 export const AddProductModal: React.FC<AddProductModalProps> = ({ dealerId, open, isOpen, onClose }) => {
   const { addProduct, dealers, branches, createPendingBill } = useApp();
   const dealer = dealers.find(d => d.id === dealerId);
@@ -191,11 +176,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ dealerId, open
   const validateRack = (rack: string): boolean => /^[A-Za-z0-9]+$/.test(rack.trim());
 
   // ── Lookup state (LookupItem[] from Firestore) ───────────────────
-  const [productNameItems, setProductNameItems] = useState<LookupItem[]>(defaultsToLookupItems(DEFAULT_PRODUCT_NAMES));
-  const [categoryItems, setCategoryItems] = useState<LookupItem[]>(defaultsToLookupItems(DEFAULT_CATEGORIES));
-  const [sizeItems, setSizeItems] = useState<LookupItem[]>(defaultsToLookupItems(DEFAULT_SIZES));
-  const [gradeItems, setGradeItems] = useState<LookupItem[]>(defaultsToLookupItems(DEFAULT_GRADES));
-  const [itemNameItems, setItemNameItems] = useState<LookupItem[]>(defaultsToLookupItems(DEFAULT_ITEM_NAMES));
+  const [productNameItems, setProductNameItems] = useState<LookupItem[]>([]);
+  const [categoryItems, setCategoryItems] = useState<LookupItem[]>([]);
+  const [sizeItems, setSizeItems] = useState<LookupItem[]>([]);
+  const [gradeItems, setGradeItems] = useState<LookupItem[]>([]);
+  const [itemNameItems, setItemNameItems] = useState<LookupItem[]>([]);
 
   // ── Inline "add new" input toggles ───────────────────────────────
   const [showNewProductInput, setShowNewProductInput] = useState(false);
@@ -341,7 +326,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ dealerId, open
       dealerId: dealerId,
       dealerName: dealer?.name || '',
       enabled: true,
-      image: 'https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=400',
+      image: '',
       specifications: {},
       unit: 'sqft',
       minOrderQuantity: 10,

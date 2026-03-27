@@ -25,10 +25,9 @@ import {
   orderBy,
 } from './firebase';
 import type { LookupItem, LookupCollectionName } from '@/app/types';
-import { PRODUCT_CATEGORIES } from '@/app/types';
 
 // ---------------------------------------------------------------------------
-// Default seed data (fallback if Firestore collections are empty)
+// Seed data (manual setup only, not used as runtime fallback)
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_PRODUCT_NAMES: string[] = [
@@ -41,7 +40,17 @@ export const DEFAULT_PRODUCT_NAMES: string[] = [
   'SGDY GRANITE STONE',
 ];
 
-export const DEFAULT_CATEGORIES: string[] = [...PRODUCT_CATEGORIES];
+export const DEFAULT_CATEGORIES: string[] = [
+  'Matt',
+  'Glossy',
+  'DC',
+  'MATT (FB)',
+  'Glossy (FB)',
+  'ELEVATION STRIP',
+  'Full Body Glossy',
+  'Full Body Matt',
+  'POLISH',
+];
 
 export const DEFAULT_SIZES: string[] = [
   '300x300 mm',
@@ -105,26 +114,11 @@ export async function fetchLookupItems(
       COLLECTIONS[collectionName],
       orderBy('sortOrder', 'asc')
     );
-    if (docs.length > 0) {
-      return docs.map(parseLookupItem);
-    }
-    // Empty → return defaults as LookupItems (first-time use)
-    console.log(`[lookupService] "${collectionName}" empty, using defaults`);
-    return defaultsAsLookupItems(collectionName);
+    return docs.map(parseLookupItem);
   } catch (err) {
-    console.warn(`[lookupService] Failed to fetch "${collectionName}", using defaults:`, err);
-    return defaultsAsLookupItems(collectionName);
+    console.warn(`[lookupService] Failed to fetch "${collectionName}":`, err);
+    return [];
   }
-}
-
-/** Convert default string arrays to LookupItem shape for local use */
-function defaultsAsLookupItems(collectionName: LookupCollectionName): LookupItem[] {
-  return LOOKUP_DEFAULTS[collectionName].map((name, index) => ({
-    id: `default-${index}`,
-    name,
-    enabled: true,
-    sortOrder: index,
-  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -152,11 +146,8 @@ export function subscribeToLookupItems(
   return subscribeToCollection<LookupItem>(
     COLLECTIONS[collectionName],
     (docs) => {
-      if (docs.length > 0) {
-        const items = docs.map(parseLookupItem).sort((a, b) => a.sortOrder - b.sortOrder);
-        callback(items);
-      }
-      // If empty, don't overwrite — keep existing defaults
+      const items = docs.map(parseLookupItem).sort((a, b) => a.sortOrder - b.sortOrder);
+      callback(items);
     },
     orderBy('sortOrder', 'asc')
   );

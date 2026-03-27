@@ -360,7 +360,7 @@ export const StockAutoUpdate: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Quick Actions (Demo - for testing) */}
+                  {/* Dev-only quick stock adjustment (hidden in production) */}
                   {import.meta.env.DEV && (
                     <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
                       <button

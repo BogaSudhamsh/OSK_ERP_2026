@@ -433,7 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerEmail: newCustomer.email,
       customerAddress: `${newCustomer.address}, ${newCustomer.city}, ${newCustomer.state} - ${newCustomer.pincode}`,
       branchId: currentUser?.branchId || '',
-      branchLocation: currentUser?.branchLocation || '',
+      branchLocation: currentUser?.branchLocation,
       status: 'new',
       notes: [],
       callLogs: [],
@@ -601,7 +601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             userId: currentUser?.id || '',
             userName: currentUser?.name || '',
             branchId: orderData.branchId || currentUser?.branchId || '',
-            branchLocation: orderData.branchLocation || currentUser?.branchLocation || '',
+            branchLocation: orderData.branchLocation || currentUser?.branchLocation,
             notes: `Auto-reduced from Order ${newOrder.id}`,
           });
         }
@@ -910,7 +910,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newMovement: StockMovement = {
       ...movementData,
       branchId: movementData.branchId || currentUser?.branchId || '',
-      branchLocation: movementData.branchLocation || currentUser?.branchLocation || '',
+      branchLocation: movementData.branchLocation || currentUser?.branchLocation,
       id: `STOCK-${String(stockMovements.length + 1).padStart(3, '0')}`,
       createdAt: new Date(),
     };

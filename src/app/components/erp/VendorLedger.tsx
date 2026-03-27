@@ -58,59 +58,34 @@ export const VendorLedger: React.FC<VendorLedgerProps> = ({ onBack }) => {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank');
   const [paymentRemarks, setPaymentRemarks] = useState('');
 
-  // Mock transactions for selected vendor
   const getVendorTransactions = (vendorId: string): VendorTransaction[] => {
-    // This would come from the database in production
-    const mockTransactions: VendorTransaction[] = [
-      {
-        id: 'txn-1',
-        date: new Date('2024-02-01'),
-        type: 'purchase',
-        description: 'Italian Marble White - Stock Inward',
-        poNumber: 'PO-2024-001',
-        invoiceNumber: 'INV-RAJ-2024-001',
-        debit: 230100,
-        credit: 0,
-        balance: 530100,
-        remarks: 'Billed: 1300 boxes @ ₹150, Actual: 1500 boxes',
-      },
-      {
-        id: 'txn-2',
-        date: new Date('2024-02-05'),
-        type: 'payment',
-        description: 'Payment Made - Bank Transfer',
-        debit: 0,
-        credit: 200000,
-        balance: 330100,
-        paymentMode: 'bank',
-        remarks: 'Ref: UTR202402050123',
-      },
-      {
-        id: 'txn-3',
-        date: new Date('2024-02-08'),
-        type: 'purchase',
-        description: 'Granite Black Galaxy - Stock Inward',
-        poNumber: 'PO-2024-005',
-        invoiceNumber: 'INV-RAJ-2024-002',
-        debit: 150000,
-        credit: 0,
-        balance: 480100,
-        remarks: 'Billed: 800 boxes @ ₹187.50',
-      },
-      {
-        id: 'txn-4',
-        date: new Date('2024-02-09'),
-        type: 'payment',
-        description: 'Payment Made - Cheque',
-        debit: 0,
-        credit: 180100,
-        balance: 300000,
-        paymentMode: 'cheque',
-        remarks: 'Cheque No: 123456',
-      },
-    ];
+    const dealer = dealers.find((d) => d.id === vendorId);
+    if (!dealer || !dealer.payments?.length) return [];
 
-    return mockTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+    let runningBalance = dealer.outstandingPayment || 0;
+    const sortedPayments = [...dealer.payments].sort(
+      (a, b) => b.paymentDate.getTime() - a.paymentDate.getTime(),
+    );
+
+    return sortedPayments.map((payment) => {
+      const paymentMode: PaymentMode = payment.paymentMethod === 'bank-transfer'
+        ? 'bank'
+        : payment.paymentMethod;
+
+      const transaction: VendorTransaction = {
+        id: payment.id,
+        date: payment.paymentDate,
+        type: 'payment',
+        description: `Payment Made - ${payment.paymentMethod.toUpperCase()}`,
+        debit: 0,
+        credit: payment.paidAmount,
+        balance: Math.max(0, runningBalance),
+        paymentMode,
+        remarks: payment.transactionRef || payment.notes,
+      };
+      runningBalance += payment.purchaseAmount - payment.paidAmount;
+      return transaction;
+    });
   };
 
   const filteredVendors = dealers.filter(vendor =>

@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Sparkles,
   TrendingUp,
-  Star,
   Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -53,13 +52,11 @@ export const ProductCatalog: React.FC = () => {
         grade: (stock.grade || matchedProduct?.grade || '') as string,
         price: stock.sellingPriceMax,
         stock: stock.freshQuantity,
-        image: matchedProduct?.images?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400',
+        image: matchedProduct?.images?.[0] || '',
         dealer: dealerName,
         dealerId: dealerId,
         branchLocation: stock.branchLocation,
         sku: stock.sku,
-        rating: 4.5 + Math.random() * 0.5,
-        featured: Math.random() > 0.7
       };
     });
 
@@ -250,22 +247,20 @@ export const ProductCatalog: React.FC = () => {
               className="transition-transform duration-300 hover:-translate-y-3"
             >
               <Card className="border-0 bg-white/90 backdrop-blur-xl hover:bg-white hover:shadow-2xl hover:shadow-[#B8860B]/20 transition-all duration-300 h-full flex flex-col overflow-hidden group relative">
-                {/* Featured Badge */}
-                {product.featured && (
-                  <div className="absolute top-3 left-3 z-20 px-3 py-1 bg-gradient-to-r from-[#B8860B] to-[#DAA520] rounded-full flex items-center gap-1 shadow-lg">
-                    <Star className="w-3 h-3 text-white fill-white" />
-                    <span className="text-xs font-bold text-white">Featured</span>
-                  </div>
-                )}
-
                 <CardContent className="p-0 flex flex-col h-full">
                   {/* Product Image */}
                   <div className="relative h-56 bg-gradient-to-br from-[#FFF8F0] to-[#FFE4B5]/30 rounded-t-xl overflow-hidden">
-                    <img 
-                      src={product.image} 
-                      alt={product.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
+                    {product.image ? (
+                      <img 
+                        src={product.image} 
+                        alt={product.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-12 h-12 text-[#B8860B]/40" />
+                      </div>
+                    )}
                     
                     {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -290,23 +285,6 @@ export const ProductCatalog: React.FC = () => {
                     <h3 className="font-bold text-[#1A1A1A] mb-2 line-clamp-2 text-lg group-hover:text-[#B8860B] transition-colors">
                       {product.name}
                     </h3>
-                    
-                    {/* Rating */}
-                    <div className="flex items-center gap-1 mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < Math.floor(product.rating)
-                              ? 'text-[#DAA520] fill-[#DAA520]'
-                              : 'text-[#6B6B6B]/30'
-                          }`}
-                        />
-                      ))}
-                      <span className="text-xs text-[#6B6B6B] ml-1 font-medium">
-                        ({product.rating.toFixed(1)})
-                      </span>
-                    </div>
 
                     <div className="space-y-2 text-sm text-[#6B6B6B] mb-4">
                       <p className="flex items-center gap-2">

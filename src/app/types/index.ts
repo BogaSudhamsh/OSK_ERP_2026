@@ -242,6 +242,8 @@ export interface Lead {
   customerPhone: string;
   customerEmail: string;
   customerAddress: string;
+  branchId?: string;
+  branchLocation?: BranchLocation;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'converted' | 'interested' | 'lost';
   assignedTo?: string;
   notes: Note[];
@@ -326,11 +328,14 @@ export interface PendingBill {
   quantity: number;
   pricePerUnit: number;
   totalAmount: number;
+  amount?: number;
   targetBranches: BranchLocation[]; // Branches that received the product
   branchPayments: BranchBillPayment[]; // Payments made by each branch
   totalPaid: number;
   remainingAmount: number;
   status: 'pending' | 'partial' | 'paid';
+  branchId?: string;
+  branchLocation?: BranchLocation;
   createdBy: string;
   createdByName: string;
   createdAt: Date;
@@ -361,6 +366,8 @@ export interface StockMovement {
   type: 'in' | 'out';
   quantity: number;
   price: number;
+  branchId?: string;
+  branchLocation?: BranchLocation;
   reference?: string;
   dealerId?: string;
   dealerName?: string;

@@ -15,6 +15,7 @@ import {
   RotateCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useApp } from '@/app/context/AppContext';
 
 interface ProductVisualizerAIProps {
   product: {
@@ -49,6 +50,7 @@ interface GeneratedImage {
 }
 
 export const ProductVisualizerAI: React.FC<ProductVisualizerAIProps> = ({ product, onClose }) => {
+  const { products } = useApp();
   const [buildingImage, setBuildingImage] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState(product);
   const [buildingParts, setBuildingParts] = useState<BuildingPart[]>([
@@ -65,14 +67,14 @@ export const ProductVisualizerAI: React.FC<ProductVisualizerAIProps> = ({ produc
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null);
 
-  // Mock available products for switching
-  const availableProducts = [
-    { id: '1', name: 'Kashmir White Granite', image: 'https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=400', category: 'Granite' },
-    { id: '2', name: 'Black Galaxy Granite', image: 'https://images.unsplash.com/photo-1634117622592-114e3024ff27?w=400', category: 'Granite' },
-    { id: '3', name: 'Carrara Marble', image: 'https://images.unsplash.com/photo-1615874694520-474822394e73?w=400', category: 'Marble' },
-    { id: '4', name: 'Tan Brown Granite', image: 'https://images.unsplash.com/photo-1567225477277-c1b88bcf2ab6?w=400', category: 'Granite' },
-    { id: '5', name: 'Italian Marble', image: 'https://images.unsplash.com/photo-1618220179428-22790b461013?w=400', category: 'Marble' },
-  ];
+  const availableProducts = products
+    .filter((p) => !!(p.images?.[0] || p.image))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      image: p.images?.[0] || p.image || '',
+      category: p.category,
+    }));
 
   const handleBuildingImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -119,14 +121,13 @@ export const ProductVisualizerAI: React.FC<ProductVisualizerAIProps> = ({ produc
     setIsGenerating(true);
     applyProductToParts();
 
-    // Simulate AI generation (in real app, this would call an AI API)
+    // Local preview generation until backend image generation is integrated
     setTimeout(() => {
-      // For demo, we'll use a construction image from Unsplash
-      const mockGeneratedImage = buildingImage; // In reality, this would be the AI-generated image
+      const generatedImage = buildingImage;
       
       const newGeneratedImage: GeneratedImage = {
         id: Date.now().toString(),
-        imageUrl: mockGeneratedImage,
+        imageUrl: generatedImage,
         appliedParts: selectedParts.map(part => ({
           part: part.name,
           productName: selectedProduct.name
@@ -135,7 +136,7 @@ export const ProductVisualizerAI: React.FC<ProductVisualizerAIProps> = ({ produc
       };
 
       setGeneratedImages(prev => [newGeneratedImage, ...prev]);
-      setCurrentGeneratedImage(mockGeneratedImage);
+      setCurrentGeneratedImage(generatedImage);
       setIsGenerating(false);
       
       // Deselect all parts after generation

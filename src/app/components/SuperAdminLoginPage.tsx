@@ -206,7 +206,7 @@ export const SuperAdminLoginPage: React.FC<SuperAdminLoginPageProps> = ({ onBack
             {/* Footer */}
             <div className="mt-7 pt-5 border-t border-[#D4AF37]/8 flex items-center justify-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500/80 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
-              <span className="text-xs text-[#C9A961]/70 tracking-wide">Mock Authentication Enabled</span>
+              <span className="text-xs text-[#C9A961]/70 tracking-wide">Firebase Authentication Enabled</span>
             </div>
           </div>
         </motion.div>

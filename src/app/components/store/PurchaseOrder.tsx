@@ -268,12 +268,12 @@ export const PurchaseOrder: React.FC<PurchaseOrderProps> = ({ order, onBack }) =
                 {order.items.map((item, index) => (
                   <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
                     <td className="p-3 text-gray-900">{index + 1}</td>
-                    <td className="p-3 text-gray-900">{item.name || 'Sample Product'}</td>
+                    <td className="p-3 text-gray-900">{item.name || item.productName || 'Unnamed Product'}</td>
                     <td className="p-3 text-gray-600">{item.category || 'Granite'}</td>
-                    <td className="text-right p-3 text-gray-900">{item.quantity || 1}</td>
-                    <td className="text-right p-3 text-gray-900">{(item.price || 1000).toLocaleString()}</td>
+                    <td className="text-right p-3 text-gray-900">{item.quantity || 0}</td>
+                    <td className="text-right p-3 text-gray-900">{(item.price || 0).toLocaleString()}</td>
                     <td className="text-right p-3 font-semibold text-gray-900">
-                      {((item.price || 1000) * (item.quantity || 1)).toLocaleString()}
+                      {((item.price || 0) * (item.quantity || 0)).toLocaleString()}
                     </td>
                   </tr>
                 ))}

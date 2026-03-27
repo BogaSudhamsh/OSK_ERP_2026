@@ -50,7 +50,9 @@ export const BranchDetailView: React.FC<BranchDetailViewProps> = ({ branchId, on
     dailyProfit: todaysSales.reduce((sum, o) => sum + (o.totalAmount * 0.15), 0),
     totalStock: stockItems.reduce((sum, item) => sum + item.freshQuantity, 0),
     pendingReceivables: branchOrders.filter((o) => o.paymentStatus !== 'paid').reduce((sum, o) => sum + o.totalAmount, 0),
-    cashInHand: todaysSales.reduce((sum, o) => sum + (o.totalAmount * 0.4), 0), // Mock 40% cash
+    cashInHand: todaysSales
+      .filter((o) => o.paymentMode === 'cash')
+      .reduce((sum, o) => sum + (o.amountPaid ?? o.totalAmount), 0),
   };
 
   const branchSales = [...branchOrders].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());

@@ -15,7 +15,7 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const quickLogins = [
+  const accountHints = [
     { 
       role: 'Branch Admin - Aziz Nagar', 
       email: 'aziz@oskgranite.com', 
@@ -58,15 +58,10 @@ export const LoginPage: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleQuickLogin = async (loginEmail: string) => {
+  const handleAccountHint = (loginEmail: string) => {
     setEmail(loginEmail);
-    setPassword('password');
-    setIsLoading(true);
-    const result = await login(loginEmail, 'password');
-    if (!result.success) {
-      setError(result.error || 'Invalid credentials.');
-    }
-    setIsLoading(false);
+    setPassword('');
+    setError('');
   };
 
   return (
@@ -187,19 +182,19 @@ export const LoginPage: React.FC = () => {
           >
             <Card className="border-[#B8860B]/20 bg-gradient-to-br from-[#1A1A1A]/90 to-[#2A1F1A]/90 backdrop-blur-xl shadow-2xl">
               <CardHeader className="space-y-1 pb-6">
-                <CardTitle className="text-2xl text-white">Quick Access</CardTitle>
+                <CardTitle className="text-2xl text-white">Account Hints</CardTitle>
                 <CardDescription className="text-[#DAA520]/60">
-                  Demo credentials for each role
+                  Select an email to prefill, then enter your real password
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {quickLogins.map((item, index) => (
+                {accountHints.map((item, index) => (
                   <motion.button
                     key={item.email}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8 + index * 0.1 }}
-                    onClick={() => handleQuickLogin(item.email)}
+                    onClick={() => handleAccountHint(item.email)}
                     className="w-full group relative overflow-hidden"
                   >
                     <div className="relative flex items-center gap-4 p-5 rounded-xl border border-[#B8860B]/20 bg-gradient-to-br from-black/40 to-black/20 hover:from-black/60 hover:to-black/40 transition-all duration-300 group-hover:border-[#DAA520]/40 group-hover:shadow-lg group-hover:shadow-[#B8860B]/10">
@@ -235,9 +230,9 @@ export const LoginPage: React.FC = () => {
               <span>System Online</span>
             </div>
             <span className="text-[#B8860B]/40">•</span>
-            <span>Mock Authentication</span>
+            <span>Firebase Authentication</span>
             <span className="text-[#B8860B]/40">•</span>
-            <span>Demo Login Ready</span>
+            <span>Live Account Login</span>
           </div>
         </motion.div>
       </motion.div>
