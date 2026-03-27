@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/app/components/ui/button';
-import { Home, Zap, Building2, Package, TrendingUp, BarChart3, Menu, X, LogOut, Receipt, Truck } from 'lucide-react';
+import { Home, Zap, Building2, Package, TrendingUp, BarChart3, Menu, X, LogOut, Receipt, Truck, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ChangePasswordDialog } from '@/app/components/auth/ChangePasswordDialog';
 
 interface CollapsibleNavProps {
   currentScreen: string;
@@ -20,6 +21,7 @@ export const CollapsibleNav: React.FC<CollapsibleNavProps> = ({
   onToggleExpanded,
 }) => {
   const { logout, pendingBills } = useApp();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   // Count pending bills
   const pendingBillsCount = pendingBills.filter(b => b.status !== 'paid').length;
 
@@ -155,8 +157,28 @@ export const CollapsibleNav: React.FC<CollapsibleNavProps> = ({
           })}
         </nav>
 
-        {/* Logout Button */}
-        <div className="p-3 border-t border-[#B8860B]/10">
+        {/* Change Password & Logout */}
+        <div className="p-3 border-t border-[#B8860B]/10 space-y-2">
+          <Button
+            onClick={() => setChangePasswordOpen(true)}
+            variant="outline"
+            className="w-full border-[#B8860B]/40 text-[#B8860B] hover:bg-[#FFF8F0] hover:border-[#B8860B] flex items-center justify-center gap-2"
+          >
+            <KeyRound className="w-5 h-5 flex-shrink-0" />
+            <AnimatePresence>
+              {isExpanded && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-sm font-medium whitespace-nowrap"
+                >
+                  Change Password
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Button>
           <Button
             onClick={logout}
             variant="outline"
@@ -248,8 +270,16 @@ export const CollapsibleNav: React.FC<CollapsibleNavProps> = ({
                 })}
               </nav>
 
-              {/* Logout Button */}
-              <div className="p-3 border-t border-[#B8860B]/10">
+              {/* Change Password & Logout */}
+              <div className="p-3 border-t border-[#B8860B]/10 space-y-2">
+                <Button
+                  onClick={() => setChangePasswordOpen(true)}
+                  variant="outline"
+                  className="w-full border-[#B8860B]/40 text-[#B8860B] hover:bg-[#FFF8F0]"
+                >
+                  <KeyRound className="w-5 h-5" />
+                  <span className="ml-2">Change Password</span>
+                </Button>
                 <Button
                   onClick={logout}
                   variant="outline"
@@ -263,6 +293,7 @@ export const CollapsibleNav: React.FC<CollapsibleNavProps> = ({
           </>
         )}
       </AnimatePresence>
+      <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
     </>
   );
 };

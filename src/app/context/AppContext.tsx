@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Customer, Product, Order, Lead, Dealer, StockMovement, Notification, CartItem, BranchStock, PendingBill, BranchBillPayment, BranchTransfer, DayBookEntry, Branch } from '@/app/types';
-import { signIn, signOutUser, subscribeToAuthState } from '@/app/services/authService';
+import { signIn, signOutUser, subscribeToAuthState, changePassword as changePasswordService } from '@/app/services/authService';
 import {
   fetchDealers as fetchDealersFromFirestore,
   subscribeToDealers,
@@ -39,6 +39,7 @@ interface AppContextType {
   authLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   
   // Customers
   customers: Customer[];
@@ -395,6 +396,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBranchTransfers([]);
     setDayBookEntries([]);
     setBranches([]);
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    return changePasswordService(currentPassword, newPassword);
   };
 
   const addCustomer = (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Customer => {
@@ -1318,6 +1323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     authLoading,
     login,
     logout,
+    changePassword,
     customers,
     addCustomer,
     updateCustomer,

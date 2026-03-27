@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/app/components/ui/button';
-import { Bell, LogOut, Menu, X } from 'lucide-react';
+import { Bell, LogOut, Menu, X, KeyRound } from 'lucide-react';
+import { ChangePasswordDialog } from '@/app/components/auth/ChangePasswordDialog';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/app/components/ui/sheet';
 import { Badge } from '@/app/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
@@ -23,6 +24,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, navigation, currentPage }) => {
   const { currentUser, logout, getFilteredNotifications, markNotificationAsRead } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   // Use branch-filtered notifications instead of raw global list
   const branchNotifications = getFilteredNotifications();
@@ -183,6 +185,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, navigation, currentPag
             <Button 
               variant="ghost" 
               size="icon" 
+              onClick={() => setChangePasswordOpen(true)} 
+              className="text-[#B8860B] hover:text-[#DAA520] hover:bg-[#B8860B]/5"
+              title="Change Password"
+            >
+              <KeyRound className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
               onClick={logout} 
               className="text-[#B8860B] hover:text-[#DAA520] hover:bg-[#B8860B]/5"
             >
@@ -214,6 +225,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, navigation, currentPag
           ))}
         </div>
       </header>
+
+      <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
       {/* Main Content */}
       <main className="p-4 lg:p-6 min-w-0 overflow-x-hidden">

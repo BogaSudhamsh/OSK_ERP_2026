@@ -24,6 +24,7 @@ import {
   type Firestore,
   type QueryConstraint as FirestoreQueryConstraint,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ── Firebase config (from .env) ───────────────────────────────────────────────
 
@@ -253,4 +254,16 @@ export function subscribeToCollection<T = Record<string, unknown>>(
     },
     (err) => console.error(`[firebase] onSnapshot error (${collectionName}):`, err),
   );
+}
+
+// ── Cloud Functions ───────────────────────────────────────────────────────────
+
+export async function callFunction<T = unknown>(
+  name: string,
+  data: Record<string, unknown>,
+): Promise<T> {
+  const functions = getFunctions(getFirebaseApp());
+  const fn = httpsCallable<Record<string, unknown>, T>(functions, name);
+  const result = await fn(data);
+  return result.data;
 }

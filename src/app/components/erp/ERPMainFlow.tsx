@@ -1,3 +1,4 @@
+import { ChangePasswordDialog } from '@/app/components/auth/ChangePasswordDialog';
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { useApp } from '@/app/context/AppContext';
@@ -18,6 +19,7 @@ import {
   Boxes,
   Bell,
   AlertTriangle,
+  KeyRound,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
@@ -181,6 +183,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
   const { logout, currentUser: contextCurrentUser } = useApp();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   // ── Resolve the current ERP user ────────────────────────────────────────
   const currentUser = contextCurrentUser;
@@ -461,6 +464,14 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
         {/* Logout */}
         <div className="p-4 border-t border-[#B8860B]/10">
           <Button
+            onClick={() => setChangePasswordOpen(true)}
+            variant="outline"
+            className="w-full mb-2 border-[#B8860B]/30 text-[#B8860B] hover:bg-[#FFF8F0]"
+          >
+            <KeyRound className="w-4 h-4 mr-2" />
+            Change Password
+          </Button>
+          <Button
             onClick={logout}
             variant="outline"
             className="w-full border-[#B8860B]/30 text-[#B8860B] hover:bg-[#FFF8F0]"
@@ -531,6 +542,14 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
 
               <div className="p-4 border-t border-[#B8860B]/10">
                 <Button
+                  onClick={() => setChangePasswordOpen(true)}
+                  variant="outline"
+                  className="w-full mb-2 border-[#B8860B]/30 text-[#B8860B] hover:bg-[#FFF8F0]"
+                >
+                  <KeyRound className="w-4 h-4 mr-2" />
+                  Change Password
+                </Button>
+                <Button
                   onClick={logout}
                   variant="outline"
                   className="w-full border-[#B8860B]/30 text-[#B8860B] hover:bg-[#FFF8F0]"
@@ -543,6 +562,8 @@ export const ERPMainFlow: React.FC<ERPMainFlowProps> = ({ userId }) => {
           </>
         )}
       </AnimatePresence>
+
+      <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 min-w-0">

@@ -12,9 +12,12 @@ import {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   type Auth,
 } from 'firebase/auth';
-import { getFirebaseApp, fetchDoc, COLLECTIONS, type FirebaseUser } from '@/app/services/firebase';
+import { getFirebaseApp, fetchDoc, COLLECTIONS, callFunction, type FirebaseUser } from '@/app/services/firebase';
 import type { User } from '@/app/types';
 
 // ── Auth singleton ────────────────────────────────────────────────────────────
@@ -128,6 +131,33 @@ export async function signOutUser(): Promise<void> {
   await signOut(getFirebaseAuth());
 }
 
+// ── Change password ───────────────────────────────────────────────────────────
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user || !user.email) {
+    return { success: false, error: 'No user is currently signed in.' };
+  }
+  try {
+    // Re-authenticate first (required by Firebase before sensitive operations)
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+    return { success: true };
+  } catch (err: any) {
+    if (err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
+      return { success: false, error: 'Current password is incorrect.' };
+    }
+    if (err?.code === 'auth/weak-password') {
+      return { success: false, error: 'New password must be at least 6 characters.' };
+    }
+    return { success: false, error: 'Failed to change password. Please try again.' };
+  }
+}
+
 // ── Password reset ────────────────────────────────────────────────────────────
 
 export async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
@@ -136,6 +166,25 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
     return { success: true };
   } catch (err: any) {
     return { success: false, error: getAuthErrorMessage(err?.code ?? '') };
+  }
+}
+
+// ── Admin: reset another user's password (via Cloud Function) ─────────────────
+
+export async function resetUserPassword(
+  targetEmail: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await callFunction<{ success: boolean; message: string }>(
+      'resetUserPassword',
+      { targetEmail, newPassword },
+    );
+    return { success: result.success };
+  } catch (err: any) {
+    // Cloud Function errors come as { code, message, details }
+    const msg = err?.message || 'Failed to reset password.';
+    return { success: false, error: msg };
   }
 }
 
