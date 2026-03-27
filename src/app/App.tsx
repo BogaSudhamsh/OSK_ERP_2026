@@ -143,7 +143,7 @@ const ERPPortal: React.FC = () => {
 };
 
 const MainAppContent: React.FC = () => {
-  const { currentUser, authLoading, login } = useApp();
+  const { currentUser, authLoading, login, logout } = useApp();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<{ id: string; name: string; email: string } | null>(null);
 
@@ -243,8 +243,11 @@ const MainAppContent: React.FC = () => {
           <InventoryPortal />
         </AuthGuard>
       );
-    default:
-      return <LoginPage />;
+    default: {
+      // Role exists but is not recognised — log out so the user returns to the Role Selector
+      setTimeout(() => logout(), 0);
+      return null;
+    }
   }
 };
 
