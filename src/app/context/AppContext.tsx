@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { User, Customer, Product, Order, Lead, Dealer, StockMovement, Notification, CartItem, BranchStock, PendingBill, BranchBillPayment, BranchTransfer, DayBookEntry, Branch } from '@/app/types';
 import { signIn, signOutUser, subscribeToAuthState, changePassword as changePasswordService } from '@/app/services/authService';
 import {
@@ -170,6 +170,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dayBookEntries, setDayBookEntries] = useState<DayBookEntry[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [autoStockReductionEnabled, setAutoStockReductionEnabled] = useState(true);
+  const dealersRef = useRef<Dealer[]>([]);
+
+  useEffect(() => {
+    dealersRef.current = dealers;
+  }, [dealers]);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState((user) => {
@@ -868,19 +873,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDealer = async (dealerData: Omit<Dealer, 'id' | 'createdAt'>): Promise<Dealer> => {
-    const nextDealNum = getMaxIdNumber(dealers.map(d => d.id), 'DEAL-') + 1;
+    const nextDealNum = getMaxIdNumber(dealersRef.current.map(d => d.id), 'DEAL-') + 1;
     const newDealer: Dealer = {
       ...dealerData,
       id: `DEAL-${String(nextDealNum).padStart(3, '0')}`,
       createdAt: new Date(),
     };
-    setDealers((prev) => [...prev, newDealer]);
+    const optimisticDealers = [...dealersRef.current, newDealer];
+    dealersRef.current = optimisticDealers;
+    setDealers(optimisticDealers);
 
     try {
       // Persist to Firestore; keep optimistic UI but rollback if write is denied/failed.
       await createDealerInFirestore(newDealer);
     } catch (err) {
-      setDealers((prev) => prev.filter((d) => d.id !== newDealer.id));
+      const rolledBackDealers = dealersRef.current.filter((d) => d.id !== newDealer.id);
+      dealersRef.current = rolledBackDealers;
+      setDealers(rolledBackDealers);
       console.error('[AppContext] Failed to write dealer to Firestore:', err);
       throw err;
     }

@@ -21,11 +21,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Plus,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { AddProductModal } from './AddProductModal';
+import { EditDealerModal } from './EditDealerModal';
 
 interface DealerDetailsProps {
   dealerId: string;
@@ -42,6 +44,7 @@ export const DealerDetails: React.FC<DealerDetailsProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStock, setFilterStock] = useState<'all' | 'available' | 'out-of-stock' | 'damaged'>('all');
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
+  const [editDealerModalOpen, setEditDealerModalOpen] = useState(false);
 
   const dealer = dealers.find(d => d.id === dealerId);
   const dealerProducts = products.filter(p => p.dealerId === dealerId);
@@ -119,9 +122,23 @@ export const DealerDetails: React.FC<DealerDetailsProps> = ({
               <Building2 className="w-8 h-8 md:w-10 md:h-10 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-2xl md:text-3xl text-[#1A1A1A] mb-2">
-                {dealer.name}
-              </CardTitle>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle className="text-2xl md:text-3xl text-[#1A1A1A] mb-2">
+                    {dealer.name}
+                  </CardTitle>
+                  <p className="text-sm text-[#6B6B6B]">Contact person: {dealer.contactPerson || 'Not added yet'}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditDealerModalOpen(true)}
+                  className="border-[#B8860B]/20 text-[#B8860B] hover:bg-[#FFF8F0]"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit Dealer
+                </Button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                 <div className="flex items-center gap-2 text-[#6B6B6B]">
                   <Phone className="w-4 h-4 text-[#B8860B]" />
@@ -135,8 +152,14 @@ export const DealerDetails: React.FC<DealerDetailsProps> = ({
                   <div className="flex items-center gap-2 text-[#6B6B6B]">
                     <MapPin className="w-4 h-4 text-[#B8860B]" />
                     <span>
-                      {dealer.district}, {dealer.state}
+                      {dealer.city ? `${dealer.city}, ` : ''}{dealer.district}, {dealer.state}
                     </span>
+                  </div>
+                )}
+                {dealer.gstNumber && (
+                  <div className="flex items-center gap-2 text-[#6B6B6B]">
+                    <DollarSign className="w-4 h-4 text-[#B8860B]" />
+                    <span>{dealer.gstNumber}</span>
                   </div>
                 )}
               </div>
@@ -243,6 +266,14 @@ export const DealerDetails: React.FC<DealerDetailsProps> = ({
           open={addProductModalOpen}
           onClose={() => setAddProductModalOpen(false)}
           dealerId={dealerId}
+        />
+      )}
+
+      {editDealerModalOpen && (
+        <EditDealerModal
+          dealerId={dealerId}
+          isOpen={editDealerModalOpen}
+          onClose={() => setEditDealerModalOpen(false)}
         />
       )}
 

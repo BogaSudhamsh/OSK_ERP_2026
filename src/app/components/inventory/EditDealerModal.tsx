@@ -16,15 +16,19 @@ interface EditDealerModalProps {
 export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOpen, onClose }) => {
   const { updateDealer, dealers } = useApp();
   const dealer = dealers.find(d => d.id === dealerId);
+  const isPlaceholderDealer = dealer?.contactPerson === 'Pending Update' || dealer?.phone === '0000000000';
 
   const [formData, setFormData] = useState({
     name: '',
     contactPerson: '',
     email: '',
     phone: '',
+    gstNumber: '',
     address: '',
+    city: '',
     state: '',
     district: '',
+    pincode: '',
     paymentTerms: '',
   });
 
@@ -36,9 +40,12 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
         contactPerson: dealer.contactPerson || '',
         email: dealer.email || '',
         phone: dealer.phone || '',
+        gstNumber: dealer.gstNumber || '',
         address: dealer.address || '',
+        city: dealer.city || '',
         state: dealer.state || '',
         district: dealer.district || '',
+        pincode: dealer.pincode || '',
         paymentTerms: dealer.paymentTerms || 'Net 30',
       });
     }
@@ -62,14 +69,22 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
       return;
     }
 
+    if (formData.pincode && !/^\d{6}$/.test(formData.pincode)) {
+      toast.error('Please enter a valid 6-digit pincode');
+      return;
+    }
+
     updateDealer(dealerId, {
       name: formData.name.trim(),
       contactPerson: formData.contactPerson.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
+      gstNumber: formData.gstNumber.trim(),
       address: formData.address.trim(),
+      city: formData.city.trim(),
       state: formData.state.trim(),
       district: formData.district.trim(),
+      pincode: formData.pincode.trim(),
       paymentTerms: formData.paymentTerms,
     });
 
@@ -106,6 +121,13 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {isPlaceholderDealer && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-medium text-amber-900">This dealer still has placeholder import details.</p>
+              <p className="text-xs text-amber-800 mt-1">Update the contact person and phone number before using this dealer for regular operations.</p>
+            </div>
+          )}
+
           {/* Business Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-[#1A1A1A] flex items-center gap-2 border-b border-[#B8860B]/20 pb-2">
@@ -124,6 +146,20 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
                 placeholder="Enter business name"
                 className="border-[#B8860B]/20 focus:border-[#B8860B]"
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-gstNumber" className="text-sm font-medium">
+                GST Number
+              </Label>
+              <Input
+                id="edit-gstNumber"
+                value={formData.gstNumber}
+                onChange={(e) => handleChange('gstNumber', e.target.value.toUpperCase())}
+                placeholder="22AAAAA0000A1Z5"
+                className="border-[#B8860B]/20 focus:border-[#B8860B]"
+                maxLength={15}
               />
             </div>
           </div>
@@ -207,6 +243,19 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="edit-city" className="text-sm font-medium">
+                  City
+                </Label>
+                <Input
+                  id="edit-city"
+                  value={formData.city}
+                  onChange={(e) => handleChange('city', e.target.value)}
+                  placeholder="Enter city"
+                  className="border-[#B8860B]/20 focus:border-[#B8860B]"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="edit-district" className="text-sm font-medium">
                   District
                 </Label>
@@ -231,6 +280,20 @@ export const EditDealerModal: React.FC<EditDealerModalProps> = ({ dealerId, isOp
                   className="border-[#B8860B]/20 focus:border-[#B8860B]"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-pincode" className="text-sm font-medium">
+                Pincode
+              </Label>
+              <Input
+                id="edit-pincode"
+                value={formData.pincode}
+                onChange={(e) => handleChange('pincode', e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                className="border-[#B8860B]/20 focus:border-[#B8860B]"
+                maxLength={6}
+              />
             </div>
           </div>
 

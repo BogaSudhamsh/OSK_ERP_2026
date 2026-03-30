@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/componen
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Button } from '@/app/components/ui/button';
+import { Textarea } from '@/app/components/ui/textarea';
 import { Building2, MapPin, Phone, Mail, User } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,8 +15,10 @@ interface AddDealerModalProps {
 }
 
 export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, onClose }) => {
-  const { addDealer } = useApp();
+  const { addDealer, dealers } = useApp();
   const modalOpen = open ?? isOpen ?? false;
+  const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -29,6 +32,112 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
     district: '',
     pincode: '',
   });
+  const [bulkDealerNames, setBulkDealerNames] = useState('');
+  const [bulkContactPerson, setBulkContactPerson] = useState('Pending Update');
+  const [bulkPhone, setBulkPhone] = useState('0000000000');
+
+  const resetSingleForm = () => {
+    setFormData({
+      name: '',
+      contactPerson: '',
+      email: '',
+      phone: '',
+      gstNumber: '',
+      address: '',
+      city: '',
+      state: '',
+      district: '',
+      pincode: '',
+    });
+  };
+
+  const resetBulkForm = () => {
+    setBulkDealerNames('');
+    setBulkContactPerson('Pending Update');
+    setBulkPhone('0000000000');
+  };
+
+  const normalizeDealerName = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+  const handleBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const parsedNames = bulkDealerNames
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    if (parsedNames.length === 0) {
+      toast.error('Paste at least one dealer name to import');
+      return;
+    }
+
+    if (!bulkContactPerson.trim()) {
+      toast.error('Enter a default contact person for imported dealers');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(bulkPhone)) {
+      toast.error('Enter a valid 10-digit default phone number');
+      return;
+    }
+
+    const existingNames = new Set(dealers.map((dealer) => normalizeDealerName(dealer.name)));
+    const seenNames = new Set<string>();
+    const uniqueNames = parsedNames.filter((name) => {
+      const normalized = normalizeDealerName(name);
+      if (seenNames.has(normalized)) {
+        return false;
+      }
+      seenNames.add(normalized);
+      return true;
+    });
+
+    const dealersToCreate = uniqueNames.filter((name) => !existingNames.has(normalizeDealerName(name)));
+
+    if (dealersToCreate.length === 0) {
+      toast.error('All pasted dealers already exist in Firestore');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      for (const name of dealersToCreate) {
+        await addDealer({
+          name,
+          contactPerson: bulkContactPerson.trim(),
+          phone: bulkPhone,
+          email: '',
+          gstNumber: '',
+          address: '',
+          city: '',
+          state: '',
+          district: '',
+          pincode: '',
+          paymentTerms: 'Net 30',
+          totalPurchases: 0,
+          totalPaid: 0,
+          outstandingPayment: 0,
+          payments: [],
+        });
+      }
+
+      const skippedCount = uniqueNames.length - dealersToCreate.length;
+      toast.success(
+        skippedCount > 0
+          ? `Imported ${dealersToCreate.length} dealers. Skipped ${skippedCount} existing dealer${skippedCount > 1 ? 's' : ''}.`
+          : `Imported ${dealersToCreate.length} dealers successfully.`
+      );
+
+      resetBulkForm();
+      onClose();
+    } catch {
+      toast.error('Bulk import failed. Check permissions and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +163,7 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
     }
 
     try {
+      setIsSubmitting(true);
       const newDealer = await addDealer({
         name: formData.name,
         contactPerson: formData.contactPerson,
@@ -79,22 +189,13 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
         </div>
       );
 
-      setFormData({
-        name: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        gstNumber: '',
-        address: '',
-        city: '',
-        state: '',
-        district: '',
-        pincode: '',
-      });
+      resetSingleForm();
 
       onClose();
     } catch {
       toast.error('Failed to add dealer. Check permissions and try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -120,7 +221,27 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-[#FFF8F0] p-1">
+          <Button
+            type="button"
+            variant={mode === 'single' ? 'default' : 'ghost'}
+            onClick={() => setMode('single')}
+            className={mode === 'single' ? 'bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B]' : 'text-[#6B6B6B]'}
+          >
+            Single Dealer
+          </Button>
+          <Button
+            type="button"
+            variant={mode === 'bulk' ? 'default' : 'ghost'}
+            onClick={() => setMode('bulk')}
+            className={mode === 'bulk' ? 'bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B]' : 'text-[#6B6B6B]'}
+          >
+            Bulk Import
+          </Button>
+        </div>
+
+        {mode === 'single' ? (
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {/* Business Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-[#1A1A1A] flex items-center gap-2 border-b border-[#B8860B]/20 pb-2">
@@ -300,19 +421,95 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
               type="button"
               variant="outline"
               onClick={onClose}
+              disabled={isSubmitting}
               className="flex-1 border-[#B8860B]/20 text-[#6B6B6B] hover:bg-[#FFF8F0]"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="flex-1 bg-gradient-to-r from-[#B8860B] to-[#DAA520] hover:from-[#DAA520] hover:to-[#B8860B] text-white"
             >
               <Building2 className="w-4 h-4 mr-2" />
-              Add Dealer
+              {isSubmitting ? 'Saving...' : 'Add Dealer'}
             </Button>
           </div>
-        </form>
+          </form>
+        ) : (
+          <form onSubmit={handleBulkSubmit} className="space-y-6 mt-4">
+            <div className="space-y-4 rounded-2xl border border-[#B8860B]/20 bg-[#FFFDF8] p-4">
+              <div className="space-y-2">
+                <Label htmlFor="bulkDealerNames" className="text-sm font-medium">
+                  Dealer Names
+                </Label>
+                <Textarea
+                  id="bulkDealerNames"
+                  value={bulkDealerNames}
+                  onChange={(e) => setBulkDealerNames(e.target.value)}
+                  placeholder={'Somany Tiles Dealer\nAGL Dealer\nMYK LETE GRATED DEALER'}
+                  className="min-h-[220px] border-[#B8860B]/20 focus-visible:border-[#B8860B]"
+                />
+                <p className="text-xs text-[#6B6B6B]">
+                  Paste one dealer name per line. Existing dealer names are skipped automatically.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bulkContactPerson" className="text-sm font-medium">
+                    Default Contact Person
+                  </Label>
+                  <Input
+                    id="bulkContactPerson"
+                    value={bulkContactPerson}
+                    onChange={(e) => setBulkContactPerson(e.target.value)}
+                    placeholder="Pending Update"
+                    className="border-[#B8860B]/20 focus:border-[#B8860B]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bulkPhone" className="text-sm font-medium">
+                    Default Phone Number
+                  </Label>
+                  <Input
+                    id="bulkPhone"
+                    value={bulkPhone}
+                    onChange={(e) => setBulkPhone(e.target.value.replace(/\D/g, ''))}
+                    placeholder="0000000000"
+                    className="border-[#B8860B]/20 focus:border-[#B8860B]"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-[#8A6D3B]">
+                Use placeholder contact details now and update each dealer later if you do not have real phone numbers yet.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-[#B8860B]/20">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="flex-1 border-[#B8860B]/20 text-[#6B6B6B] hover:bg-[#FFF8F0]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 bg-gradient-to-r from-[#B8860B] to-[#DAA520] hover:from-[#DAA520] hover:to-[#B8860B] text-white"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                {isSubmitting ? 'Importing...' : 'Import Dealers'}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
