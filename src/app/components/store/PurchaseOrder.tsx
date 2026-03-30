@@ -15,6 +15,7 @@ import {
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import oskLogo from '@/assets/356d3a3460dadc43b90004f966e6aa635e39adc6.png';
+import { callFunction } from '@/app/services/firebase';
 
 interface PurchaseOrderProps {
   order: {
@@ -37,12 +38,82 @@ interface PurchaseOrderProps {
 export const PurchaseOrder: React.FC<PurchaseOrderProps> = ({ order, onBack }) => {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  const handleDownloadPDF = () => {
-    toast.success('PDF Download Started', {
-      description: 'Purchase order is being downloaded'
-    });
-    // In real app, generate and download PDF
+  const imageToDataUrl = async (src: string): Promise<string | null> => {
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string) || '');
+        reader.onerror = () => reject(new Error('Failed to read logo image'));
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.warn('[PurchaseOrder] Could not load logo for PDF:', error);
+      return null;
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      const logoDataUrl = await imageToDataUrl(oskLogo);
+
+      const response = await callFunction<{
+        fileName: string;
+        mimeType: string;
+        base64: string;
+      }>('generatePurchaseOrderPdf', {
+        order: {
+          id: order.id,
+          customer: {
+            id: order.customer.id,
+            name: order.customer.name,
+            phone: order.customer.phone,
+            location: order.customer.location,
+          },
+          items: order.items,
+          subtotal: order.subtotal,
+          total: order.total,
+          logoDataUrl,
+          signatureName: 'OSK Granite Authorized Signatory',
+          createdAt: order.createdAt?.toISOString?.() || new Date(order.createdAt).toISOString(),
+        },
+      });
+
+      if (!response?.base64) {
+        throw new Error('PDF payload missing');
+      }
+
+      const binary = window.atob(response.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      const blob = new Blob([bytes], { type: response.mimeType || 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = response.fileName || `${order.id}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('PDF downloaded successfully', {
+        description: `Purchase order ${order.id} was generated from backend`,
+      });
+    } catch (error) {
+      console.error('[PurchaseOrder] PDF generation failed:', error);
+      toast.error('Failed to download PDF', {
+        description: 'Could not generate purchase order PDF from server',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleSendToCustomer = async () => {
@@ -170,10 +241,11 @@ export const PurchaseOrder: React.FC<PurchaseOrderProps> = ({ order, onBack }) =
           <Button
             onClick={handleDownloadPDF}
             variant="outline"
+            disabled={isGeneratingPdf}
             className="border-[#C9A961]/30 text-[#C9A961]"
           >
             <Download className="w-4 h-4 mr-2" />
-            Download PDF
+            {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
           </Button>
           <Button
             onClick={handlePrint}
