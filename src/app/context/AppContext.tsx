@@ -603,6 +603,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error('[AppContext] Failed to write branch stock to Firestore:', err)
       );
     });
+
+    // Notify only super-admin about new product creation
+    addNotification({
+      type: 'info',
+      title: 'New Product Added',
+      message: `${newProduct.name} (${newProduct.id}) added to inventory`,
+      targetRoles: ['super-admin'],
+      global: true,
+    });
     
     return newProduct;
   };
@@ -806,6 +815,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const orderToUpdate = orders.find(o => o.id === orderId);
     if (orderToUpdate) {
       updateDocument(COLLECTIONS.orders, orderId, { status }).catch(console.error);
+
+      // Notify store-side users dynamically when order moves for dispatch/delivery
+      if (status === 'processing' || status === 'completed') {
+        const statusLabel = status === 'processing' ? 'Out for Dispatch' : 'Delivered';
+        addNotification({
+          type: status === 'processing' ? 'info' : 'success',
+          title: `Order ${statusLabel}`,
+          message: `${orderToUpdate.poNumber || orderToUpdate.id} is ${statusLabel.toLowerCase()} for ${orderToUpdate.customerName}`,
+          branchId: orderToUpdate.branchId,
+          branchLocation: orderToUpdate.branchLocation,
+          targetRoles: ['store', 'store-manager', 'store-staff', 'sales-manager', 'cashier'],
+        });
+      }
     }
   };
 
@@ -1007,6 +1029,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const markNotificationAsRead = (id: string) => {
     setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+    updateDocument(COLLECTIONS.notifications, id, { read: true }).catch((err) =>
+      console.error('[AppContext] Failed to mark notification as read in Firestore:', err)
+    );
   };
 
   const addNotification = (notificationData: Omit<Notification, 'id' | 'read' | 'createdAt'>) => {
@@ -1023,22 +1048,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date(),
     };
     setNotifications(prev => [newNotification, ...prev]);
+    setDocument(COLLECTIONS.notifications, newNotification.id, newNotification, false).catch((err) =>
+      console.error('[AppContext] Failed to write notification to Firestore:', err)
+    );
   };
 
   const getFilteredNotifications = (): Notification[] => {
     if (!currentUser) return [];
     
-    // Super-admins, inventory, and sales roles see ALL notifications
-    if (['super-admin', 'inventory', 'sales'].includes(currentUser.role)) {
-      return notifications;
-    }
-    
-    // Branch-scoped roles only see:
-    // 1. Global notifications (global: true)
-    // 2. Notifications with no branch set (legacy/system-wide)
-    // 3. Notifications matching their own branchLocation
     const userBranch = currentUser.branchLocation;
+    const userRole = currentUser.role;
+
     return notifications.filter(n => {
+      // Explicit role targeting takes highest priority
+      if (n.targetRoles && n.targetRoles.length > 0) {
+        if (!n.targetRoles.includes(userRole)) return false;
+
+        // If targeted and also scoped to branch, enforce branch match
+        if (n.branchLocation) return n.branchLocation === userBranch;
+        if (n.branchId && currentUser.branchId) return n.branchId === currentUser.branchId;
+        return true;
+      }
+
+      // Existing behavior for non-targeted notifications
+      if (['super-admin', 'inventory', 'sales'].includes(userRole)) {
+        return true;
+      }
       if (n.global) return true;
       if (!n.branchLocation) return true; // legacy notifications without branch scope
       return n.branchLocation === userBranch;
@@ -1061,9 +1096,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             id: `notif-${Date.now()}-${notifCounter}`,
             read: false,
             global: true, // Low stock alerts visible to inventory/sales/super-admin roles
+            targetRoles: ['super-admin', 'inventory-manager', 'inventory', 'sales-manager', 'sales'],
             createdAt: new Date(),
           };
           setNotifications(prev => [newNotification, ...prev]);
+          setDocument(COLLECTIONS.notifications, newNotification.id, newNotification, false).catch((err) =>
+            console.error('[AppContext] Failed to write low stock alert to Firestore:', err)
+          );
         }
       }
     });

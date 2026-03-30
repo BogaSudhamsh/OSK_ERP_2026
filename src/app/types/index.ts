@@ -391,6 +391,7 @@ export interface Notification {
   branchLocation?: string;
   userId?: string;
   global?: boolean; // true = visible to all users/branches
+  targetRoles?: UserRole[]; // Optional role-based targeting
   createdAt: Date;
 }
 
