@@ -19,6 +19,7 @@ import {
   COLLECTIONS,
   fetchCollection,
   createDoc,
+  setDocument,
   updateDocument,
   deleteDocument,
   subscribeToCollection,
@@ -171,6 +172,37 @@ export function subscribeToLookupNames(
 // Add a new lookup item
 // ---------------------------------------------------------------------------
 
+function generateCustomId(
+  collectionName: LookupCollectionName,
+  currentItems: LookupItem[]
+): string {
+  const prefixes: Record<LookupCollectionName, string> = {
+    categories: 'cat',
+    sizes: 'size',
+    grades: 'grade',
+    productNames: 'prod',
+    itemNames: 'item',
+  };
+
+  const prefix = prefixes[collectionName];
+  
+  // Extract numbers from existing IDs following the pattern "prefix-N"
+  const existingNumbers = currentItems
+    .map((item) => {
+      const match = item.id.match(new RegExp(`^${prefix}-(\\d+)$`));
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter((num) => num > 0);
+
+  // Find the next number
+  const nextNumber =
+    existingNumbers.length > 0
+      ? Math.max(...existingNumbers) + 1
+      : 1;
+
+  return `${prefix}-${nextNumber}`;
+}
+
 export async function addLookupItem(
   collectionName: LookupCollectionName,
   name: string,
@@ -180,7 +212,10 @@ export async function addLookupItem(
     ? Math.max(...currentItems.map((i) => i.sortOrder)) + 1
     : 0;
 
-  const docId = await createDoc(COLLECTIONS[collectionName], {
+  const docId = generateCustomId(collectionName, currentItems);
+
+  await setDocument(COLLECTIONS[collectionName], docId, {
+    id: docId,
     name,
     enabled: true,
     sortOrder: nextOrder,
