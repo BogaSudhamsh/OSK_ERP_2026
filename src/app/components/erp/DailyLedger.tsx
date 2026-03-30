@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -102,6 +102,27 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
   const [expandedBranch, setExpandedBranch] = useState<string | null>(isSuperAdmin ? null : (currentBranchLocation || null));
   const [ledgerView, setLedgerView] = useState<'all' | 'income' | 'expenses'>('all');
 
+  const availableBranchLocations = useMemo(() => {
+    const branchLocations = Array.from(new Set(branches.map(b => b.location)));
+    return branchLocations.length > 0
+      ? branchLocations
+      : ['aziz-nagar', 'vikarabad', 'sangareddy'];
+  }, [branches]);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      if (selectedBranch !== 'all' && !availableBranchLocations.includes(selectedBranch)) {
+        setSelectedBranch('all');
+      }
+      return;
+    }
+
+    const branchLocation = currentBranchLocation || availableBranchLocations[0] || 'aziz-nagar';
+    if (selectedBranch !== branchLocation) {
+      setSelectedBranch(branchLocation);
+    }
+  }, [isSuperAdmin, selectedBranch, currentBranchLocation, availableBranchLocations]);
+
   // Form state
   const [formAmount, setFormAmount] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -153,7 +174,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
   const entriesByBranch = useMemo(() => {
     const targetDate = new Date(selectedDate);
     const grouped: Record<string, DayBookEntry[]> = {};
-    const branchLocs = selectedBranch === 'all' ? ['aziz-nagar', 'vikarabad', 'sangareddy'] : [selectedBranch];
+    const branchLocs = selectedBranch === 'all' ? availableBranchLocations : [selectedBranch];
     branchLocs.forEach(loc => {
       grouped[loc] = dayBookEntries.filter(entry => {
         const matchesDate = isSameDay(entry.date, targetDate);
@@ -171,13 +192,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
       }).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     });
     return grouped;
-  }, [dayBookEntries, selectedDate, selectedBranch, ledgerView, filterSubcategory]);
+  }, [dayBookEntries, selectedDate, selectedBranch, ledgerView, filterSubcategory, availableBranchLocations]);
 
   // Per-branch income/expense totals
   const branchSummary = useMemo(() => {
     const targetDate = new Date(selectedDate);
     const summary: Record<string, { income: number; expense: number; entries: number }> = {};
-    ['aziz-nagar', 'vikarabad', 'sangareddy'].forEach(loc => {
+    availableBranchLocations.forEach(loc => {
       const branchEntries = dayBookEntries.filter(e =>
         isSameDay(e.date, targetDate) &&
         e.branchLocation === loc &&
@@ -190,7 +211,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
       };
     });
     return summary;
-  }, [dayBookEntries, selectedDate]);
+  }, [dayBookEntries, selectedDate, availableBranchLocations]);
 
   const grandIncome = Object.values(branchSummary).reduce((a, b) => a + b.income, 0);
   const grandExpense = Object.values(branchSummary).reduce((a, b) => a + b.expense, 0);
@@ -209,7 +230,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
 
   const handleAddEntry = () => {
     const amount = parseFloat(formAmount);
-    if (!amount || amount <= 0) {
+    if (!amount || amount <= 0 || !isFinite(amount)) {
       toast.error('Please enter a valid amount (even ₹1 counts!)');
       return;
     }
@@ -218,17 +239,34 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
       return;
     }
 
-    const branchLoc = isSuperAdmin ? selectedBranch : (currentBranchLocation || 'aziz-nagar');
+    const branchLoc = isSuperAdmin
+      ? selectedBranch
+      : (currentBranchLocation || selectedBranch || availableBranchLocations[0] || 'aziz-nagar');
     if (branchLoc === 'all') {
       toast.error('Please select a specific branch');
       return;
     }
 
     const branch = branches.find(b => b.location === branchLoc);
+    if (!branch) {
+      toast.error(`Branch "${branchLoc}" not found. Please refresh and try again.`);
+      return;
+    }
+
+    const resolvedBranchId = branch?.id || currentBranchId;
+    if (!resolvedBranchId) {
+      toast.error('Unable to resolve branch ID. Please refresh and try again.');
+      return;
+    }
+
     const targetDate = new Date(selectedDate);
+    if (!isFinite(targetDate.getTime())) {
+      toast.error('Invalid date selected. Please try again.');
+      return;
+    }
 
     addDayBookEntry({
-      branchId: branch?.id || 'branch-1',
+      branchId: resolvedBranchId,
       branchLocation: branchLoc as BranchLocation,
       date: targetDate,
       description: formDescription.trim(),
@@ -303,9 +341,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
-                <SelectItem value="aziz-nagar">Aziz Nagar</SelectItem>
-                <SelectItem value="vikarabad">Vikarabad</SelectItem>
-                <SelectItem value="sangareddy">Sangareddy</SelectItem>
+                {availableBranchLocations.map(loc => (
+                  <SelectItem key={loc} value={loc}>
+                    {branches.find(b => b.location === loc)?.name?.replace('OSK Granite - ', '') || loc}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -406,9 +446,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
                           <SelectValue placeholder="Select branch" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="aziz-nagar">Aziz Nagar</SelectItem>
-                          <SelectItem value="vikarabad">Vikarabad</SelectItem>
-                          <SelectItem value="sangareddy">Sangareddy</SelectItem>
+                          {availableBranchLocations.map(loc => (
+                            <SelectItem key={loc} value={loc}>
+                              {branches.find(b => b.location === loc)?.name?.replace('OSK Granite - ', '') || loc}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -601,7 +643,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ userRole, currentBranc
       {isSuperAdmin && selectedBranch === 'all' ? (
         // Super Admin: Grouped by branch
         <div className="space-y-4">
-          {['aziz-nagar', 'vikarabad', 'sangareddy'].map(loc => {
+          {availableBranchLocations.map(loc => {
             const branchEntries = entriesByBranch[loc] || [];
             const branchTotal = branchEntries.reduce((sum, e) => sum + e.amount, 0);
             const isExpanded = expandedBranch === loc;

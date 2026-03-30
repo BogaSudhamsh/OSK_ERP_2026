@@ -304,6 +304,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const globalUser = isGlobalRole(currentUser);
     const branchId  = currentUser.branchId;
+    const branchLocation = currentUser.branchLocation;
 
     // Build a branch filter for non-global users
     const branchFilter: QueryConstraint[] =
@@ -320,7 +321,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubLeads     = subscribeToCollection<Lead>(COLLECTIONS.leads, (data) => { console.log(`[DATA] leads: ${data.length}`); setLeads(data); }, ...branchFilter);
     const unsubBills     = subscribeToCollection<PendingBill>(COLLECTIONS.bills, (data) => { console.log(`[DATA] bills: ${data.length}`); setPendingBills(data); }, ...branchFilter);
     const unsubMovements = subscribeToCollection<StockMovement>(COLLECTIONS.stockMovements, (data) => { console.log(`[DATA] stockMovements: ${data.length}`); setStockMovements(data); }, ...branchFilter);
-    const unsubDayBook   = subscribeToCollection<DayBookEntry>(COLLECTIONS.dayBookEntries, (data) => { console.log(`[DATA] dayBookEntries: ${data.length}`); setDayBookEntries(data); }, ...branchFilter);
+    const normalizeDayBookEntries = (data: DayBookEntry[]): DayBookEntry[] => {
+      return data.map((entry: any) => {
+        try {
+          // Handle Firestore Timestamp objects
+          let normalizedDate = entry?.date;
+          if (normalizedDate && typeof normalizedDate === 'object' && 'toDate' in normalizedDate) {
+            normalizedDate = (normalizedDate as any).toDate();
+          } else if (typeof normalizedDate === 'string') {
+            normalizedDate = new Date(normalizedDate);
+          } else if (!(normalizedDate instanceof Date)) {
+            normalizedDate = new Date();
+          }
+          
+          let normalizedCreatedAt = entry?.createdAt;
+          if (normalizedCreatedAt && typeof normalizedCreatedAt === 'object' && 'toDate' in normalizedCreatedAt) {
+            normalizedCreatedAt = (normalizedCreatedAt as any).toDate();
+          } else if (typeof normalizedCreatedAt === 'string') {
+            normalizedCreatedAt = new Date(normalizedCreatedAt);
+          } else if (!(normalizedCreatedAt instanceof Date)) {
+            normalizedCreatedAt = new Date();
+          }
+          
+          return {
+            ...entry,
+            date: normalizedDate,
+            createdAt: normalizedCreatedAt,
+          };
+        } catch (e) {
+          console.error('[AppContext] Error normalizing dayBook entry:', e, entry);
+          return {
+            ...entry,
+            date: new Date(),
+            createdAt: new Date(),
+          };
+        }
+      });
+    };
+
+    const setMergedDayBookEntries = (incoming: DayBookEntry[], merge = false) => {
+      const normalized = normalizeDayBookEntries(incoming);
+      if (!merge) {
+        setDayBookEntries(normalized);
+        return;
+      }
+      setDayBookEntries((prev) => {
+        const byId = new Map<string, DayBookEntry>();
+        [...prev, ...normalized].forEach((entry) => byId.set(entry.id, entry));
+        return Array.from(byId.values());
+      });
+    };
+
+    const unsubDayBook = subscribeToCollection<DayBookEntry>(
+      COLLECTIONS.dayBookEntries,
+      (data) => {
+        console.log(`[DATA] dayBookEntries by branchId: ${data.length}`);
+        setMergedDayBookEntries(data, false);
+      },
+      ...branchFilter,
+    );
+
+    let unsubDayBookByLocation: (() => void) | null = null;
+    if (!globalUser && branchLocation) {
+      unsubDayBookByLocation = subscribeToCollection<DayBookEntry>(
+        COLLECTIONS.dayBookEntries,
+        (data) => {
+          console.log(`[DATA] dayBookEntries by branchLocation: ${data.length}`);
+          setMergedDayBookEntries(data, true);
+        },
+        where('branchLocation', '==', branchLocation),
+      );
+    }
     // Notifications: non-global users filter by branchId
     const notifFilter: QueryConstraint[] =
       !globalUser && branchId ? [where('branchId', '==', branchId)] : [];
@@ -366,6 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubTransfersFrom();
       if (unsubTransfersTo) unsubTransfersTo();
       unsubDayBook();
+      if (unsubDayBookByLocation) unsubDayBookByLocation();
       unsubNotifs();
     };
   }, [currentUser]);
@@ -1307,14 +1379,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDayBookEntry = (entryData: Omit<DayBookEntry, 'id' | 'createdAt'>): DayBookEntry => {
-    const nextNum = dayBookEntries.length + 1;
+    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const newEntry: DayBookEntry = {
       ...entryData,
-      id: `DBE-${String(nextNum).padStart(3, '0')}`,
+      id: `DBE-${uniqueSuffix}`,
       createdAt: new Date(),
     };
-    setDayBookEntries([...dayBookEntries, newEntry]);
-    setDocument(COLLECTIONS.dayBookEntries, newEntry.id, newEntry, false).catch(console.error);
+    setDayBookEntries(prev => [...prev, newEntry]);
+    
+    // Persist to Firestore with proper error handling
+    setDocument(COLLECTIONS.dayBookEntries, newEntry.id, newEntry, false).catch((err: any) => {
+      console.error('[AppContext] Failed to write dayBookEntry to Firestore:', err);
+      // Remove from state if write fails
+      setDayBookEntries(prev => prev.filter(e => e.id !== newEntry.id));
+      // Notify user of the failure
+      addNotification({
+        type: 'error',
+        title: 'Save Failed',
+        message: `Failed to save ₹${newEntry.amount} entry. ${err?.code === 'permission-denied' ? 'Permission denied.' : 'Please try again.'}`,
+        branchLocation: newEntry.branchLocation,
+      });
+    });
+    
     return newEntry;
   };
 
