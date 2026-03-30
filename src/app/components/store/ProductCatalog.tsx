@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -21,19 +21,27 @@ const formatBranch = (loc: string) =>
   loc.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
 export const ProductCatalog: React.FC = () => {
-  const { currentUser, addToCart, branchStock, products } = useApp();
+  const { currentUser, addToCart, branchStock, products, branches: branchMaster } = useApp();
 
   // Default branch filter to the logged-in user's store (if available)
-  const defaultBranch = currentUser?.branchLocation ? formatBranch(currentUser.branchLocation) : 'All';
+  const userBranch = currentUser?.branchLocation ? formatBranch(currentUser.branchLocation) : '';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [branchFilter, setBranchFilter] = useState<string>(defaultBranch);
+  const [branchFilter, setBranchFilter] = useState<string>(userBranch || 'All');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [productFilter, setProductFilter] = useState<string>('All');
   const [gradeFilter, setGradeFilter] = useState<string>('All');
   const [stockFilter, setStockFilter] = useState<string>('All');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [selectedProductForAI, setSelectedProductForAI] = useState<any | null>(null);
+
+  useEffect(() => {
+    const nextBranchFilter = userBranch || 'All';
+    setBranchFilter(nextBranchFilter);
+    setCategoryFilter('All');
+    setProductFilter('All');
+    setGradeFilter('All');
+  }, [userBranch]);
 
   // Get all products from branch stock (exclude central inventory)
   const allProducts = branchStock
@@ -61,10 +69,16 @@ export const ProductCatalog: React.FC = () => {
     });
 
   // ── Cascade 1: Branch → all others
-  const branches: string[] = ['All', ...Array.from(new Set<string>(allProducts.map(p => formatBranch(p.branchLocation as string))))];
+  const stockBranchOptions = Array.from(new Set<string>(allProducts.map(p => formatBranch(p.branchLocation as string))));
+  const masterBranchOptions = branchMaster
+    .filter(b => b.location !== 'central')
+    .map(b => formatBranch(b.location));
+  const branchOptions: string[] = ['All', ...Array.from(new Set<string>([...masterBranchOptions, ...stockBranchOptions]))];
 
   // ── Cascade 2: Category options filtered by branch
-  const afterBranch = branchFilter === 'All' ? allProducts : allProducts.filter(p => formatBranch(p.branchLocation as string) === branchFilter);
+  const afterBranch = branchFilter === 'All'
+    ? allProducts
+    : allProducts.filter(p => formatBranch(p.branchLocation as string) === branchFilter);
   const categories: string[] = ['All', ...Array.from(new Set<string>(afterBranch.map(p => p.category as string)))];
 
   // ── Cascade 3: Product options filtered by branch + category
@@ -167,7 +181,7 @@ export const ProductCatalog: React.FC = () => {
                   onChange={(e) => { setBranchFilter(e.target.value); setCategoryFilter('All'); setProductFilter('All'); setGradeFilter('All'); }}
                   className="w-full h-12 bg-[#FFF8F0] border-2 border-[#B8860B]/20 text-[#1A1A1A] rounded-xl px-4 focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20 focus:outline-none font-medium cursor-pointer"
                 >
-                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                  {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
 
