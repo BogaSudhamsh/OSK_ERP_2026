@@ -132,19 +132,19 @@ service cloud.firestore {
     }
 
     function isErpSuperAdmin() {
-      return isAuthenticated() && erpRole() == 'super-admin';
+      return isAuthenticated() && erpRole() in ['super-admin', 'super admin', 'Super Admin'];
     }
 
     function isErpInventoryManager() {
-      return isAuthenticated() && erpRole() == 'inventory-manager';
+      return isAuthenticated() && erpRole() in ['inventory-manager', 'inventory manager', 'Inventory Manager', 'inventory'];
     }
 
     function isErpBranchAdmin() {
-      return isAuthenticated() && erpRole() == 'branch-admin';
+      return isAuthenticated() && erpRole() in ['branch-admin', 'branch admin', 'Branch Admin'];
     }
 
     function isErpStockManager() {
-      return isAuthenticated() && erpRole() == 'stock-manager';
+      return isAuthenticated() && erpRole() in ['stock-manager', 'stock manager', 'Stock Manager'];
     }
 
     function isErpSalesRole() {

@@ -24,27 +24,31 @@ export const DealerManagement: React.FC = () => {
     paymentTerms: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addDealer({
-      ...formData,
-      totalPurchases: 0,
-      totalPaid: 0,
-      outstandingPayment: 0,
-      payments: [],
-    });
-    toast.success('Dealer added successfully');
-    setIsDialogOpen(false);
-    setFormData({
-      name: '',
-      contactPerson: '',
-      phone: '',
-      email: '',
-      address: '',
-      state: '',
-      district: '',
-      paymentTerms: '',
-    });
+    try {
+      await addDealer({
+        ...formData,
+        totalPurchases: 0,
+        totalPaid: 0,
+        outstandingPayment: 0,
+        payments: [],
+      });
+      toast.success('Dealer added successfully');
+      setIsDialogOpen(false);
+      setFormData({
+        name: '',
+        contactPerson: '',
+        phone: '',
+        email: '',
+        address: '',
+        state: '',
+        district: '',
+        paymentTerms: '',
+      });
+    } catch {
+      toast.error('Failed to add dealer. Check permissions and try again.');
+    }
   };
 
   const totalOutstanding = dealers.reduce((sum, d) => sum + d.outstandingPayment, 0);

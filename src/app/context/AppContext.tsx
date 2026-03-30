@@ -76,7 +76,7 @@ interface AppContextType {
   
   // Dealers
   dealers: Dealer[];
-  addDealer: (dealer: Omit<Dealer, 'id' | 'createdAt'>) => Dealer;
+  addDealer: (dealer: Omit<Dealer, 'id' | 'createdAt'>) => Promise<Dealer>;
   updateDealer: (dealerId: string, updates: Partial<Dealer>) => void;
   addDealerPayment: (payment: any) => void;
   
@@ -319,7 +319,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubStock     = subscribeToCollection<BranchStock>(COLLECTIONS.stock, (data) => { console.log(`[DATA] branchStock: ${data.length}`); setBranchStock(data); }, ...branchFilter);
     const unsubOrders    = subscribeToCollection<Order>(COLLECTIONS.orders, (data) => { console.log(`[DATA] orders: ${data.length}`); setOrders(data); }, ...branchFilter);
     const unsubLeads     = subscribeToCollection<Lead>(COLLECTIONS.leads, (data) => { console.log(`[DATA] leads: ${data.length}`); setLeads(data); }, ...branchFilter);
-    const unsubBills     = subscribeToCollection<PendingBill>(COLLECTIONS.bills, (data) => { console.log(`[DATA] bills: ${data.length}`); setPendingBills(data); }, ...branchFilter);
+    // Bills are cross-branch: any branch can pay a dealer bill, so all authenticated users
+    // must see all bills regardless of which branch created them.
+    const unsubBills     = subscribeToCollection<PendingBill>(COLLECTIONS.bills, (data) => { console.log(`[DATA] bills: ${data.length}`); setPendingBills(data); });
     const unsubMovements = subscribeToCollection<StockMovement>(COLLECTIONS.stockMovements, (data) => { console.log(`[DATA] stockMovements: ${data.length}`); setStockMovements(data); }, ...branchFilter);
     const normalizeDayBookEntries = (data: DayBookEntry[]): DayBookEntry[] => {
       return data.map((entry: any) => {
@@ -865,19 +867,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addDealer = (dealerData: Omit<Dealer, 'id' | 'createdAt'>): Dealer => {
+  const addDealer = async (dealerData: Omit<Dealer, 'id' | 'createdAt'>): Promise<Dealer> => {
     const nextDealNum = getMaxIdNumber(dealers.map(d => d.id), 'DEAL-') + 1;
     const newDealer: Dealer = {
       ...dealerData,
       id: `DEAL-${String(nextDealNum).padStart(3, '0')}`,
       createdAt: new Date(),
     };
-    setDealers([...dealers, newDealer]);
+    setDealers((prev) => [...prev, newDealer]);
 
-    // Persist to Firestore (fire-and-forget, real-time listener will sync)
-    createDealerInFirestore(newDealer).catch((err) =>
-      console.error('[AppContext] Failed to write dealer to Firestore:', err)
-    );
+    try {
+      // Persist to Firestore; keep optimistic UI but rollback if write is denied/failed.
+      await createDealerInFirestore(newDealer);
+    } catch (err) {
+      setDealers((prev) => prev.filter((d) => d.id !== newDealer.id));
+      console.error('[AppContext] Failed to write dealer to Firestore:', err);
+      throw err;
+    }
 
     return newDealer;
   };
@@ -1178,7 +1184,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Pending Bills Management
   const createPendingBill = (billData: any): PendingBill => {
-    const billNumber = `BILL-${String(pendingBills.length + 1).padStart(4, '0')}`;
+    // Use timestamp + random suffix to avoid duplicate IDs when Firestore state hasn't synced yet
+    const billNumber = `BILL-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     
     const newBill: PendingBill = {
       id: billNumber,

@@ -30,7 +30,7 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
     pincode: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.contactPerson || !formData.phone) {
@@ -53,45 +53,49 @@ export const AddDealerModal: React.FC<AddDealerModalProps> = ({ open, isOpen, on
       return;
     }
 
-    const newDealer = addDealer({
-      name: formData.name,
-      contactPerson: formData.contactPerson,
-      email: formData.email,
-      phone: formData.phone,
-      gstNumber: formData.gstNumber,
-      address: formData.address,
-      city: formData.city,
-      state: formData.state,
-      district: formData.district,
-      pincode: formData.pincode,
-      paymentTerms: 'Net 30',
-      totalPurchases: 0,
-      totalPaid: 0,
-      outstandingPayment: 0,
-      payments: [],
-    });
+    try {
+      const newDealer = await addDealer({
+        name: formData.name,
+        contactPerson: formData.contactPerson,
+        email: formData.email,
+        phone: formData.phone,
+        gstNumber: formData.gstNumber,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        district: formData.district,
+        pincode: formData.pincode,
+        paymentTerms: 'Net 30',
+        totalPurchases: 0,
+        totalPaid: 0,
+        outstandingPayment: 0,
+        payments: [],
+      });
 
-    toast.success(
-      <div>
-        <p className="font-semibold">Dealer Added Successfully!</p>
-        <p className="text-sm">{newDealer.name} - {newDealer.city}</p>
-      </div>
-    );
+      toast.success(
+        <div>
+          <p className="font-semibold">Dealer Added Successfully!</p>
+          <p className="text-sm">{newDealer.name} - {newDealer.city}</p>
+        </div>
+      );
 
-    setFormData({
-      name: '',
-      contactPerson: '',
-      email: '',
-      phone: '',
-      gstNumber: '',
-      address: '',
-      city: '',
-      state: '',
-      district: '',
-      pincode: '',
-    });
+      setFormData({
+        name: '',
+        contactPerson: '',
+        email: '',
+        phone: '',
+        gstNumber: '',
+        address: '',
+        city: '',
+        state: '',
+        district: '',
+        pincode: '',
+      });
 
-    onClose();
+      onClose();
+    } catch {
+      toast.error('Failed to add dealer. Check permissions and try again.');
+    }
   };
 
   const handleChange = (field: string, value: string) => {
