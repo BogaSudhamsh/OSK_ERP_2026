@@ -56,6 +56,16 @@ const BRANCH_COLORS: Record<string, { primary: string; light: string; label: str
   'branch-3': { primary: '#10B981', light: '#D1FAE5', label: 'Sangareddy' },
 };
 
+const toTitleCase = (value: string) =>
+  value
+    .split('-')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const getBranchDisplayName = (branch: { id: string; name?: string; location?: string }) =>
+  branch.name?.trim() || BRANCH_COLORS[branch.id]?.label || (branch.location ? toTitleCase(branch.location) : branch.id);
+
 const formatCurrency = (val: number) => {
   if (val >= 10000000) return `${(val / 10000000).toFixed(2)}Cr`;
   if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
@@ -234,14 +244,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
 
   // ── Chart Data ──────────────────────────────────────────────────────────
   const revenueChartData = metrics.branchData.map(m => ({
-    name: BRANCH_COLORS[m.branch.id]?.label || m.branch.name,
+    name: getBranchDisplayName(m.branch),
     Revenue: m.orders.revenue,
     Collected: m.orders.collected,
     Due: m.orders.due,
   }));
 
   const stockChartData = metrics.branchData.map(m => ({
-    name: BRANCH_COLORS[m.branch.id]?.label || m.branch.name,
+    name: getBranchDisplayName(m.branch),
     Fresh: m.stock.totalFreshStock,
     Broken: m.stock.totalBrokenStock,
     Total: m.stock.totalActualStock,
@@ -373,8 +383,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                             <Building2 className="w-5 h-5" style={{ color: color?.primary }} />
                           </div>
                           <div>
-                            <p className="font-bold text-[#2C2C2C]">{color?.label}</p>
-                            <p className="text-[10px] text-[#6B6B6B]">{m.branch.manager} • {m.stock.uniqueProducts} products</p>
+                            <p className="font-bold text-[#2C2C2C]">{getBranchDisplayName(m.branch)}</p>
+                            <p className="text-[10px] text-[#6B6B6B]">
+                              {toTitleCase(m.branch.location)} • {m.branch.manager} • {m.stock.uniqueProducts} products
+                            </p>
                           </div>
                         </div>
                         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Active</Badge>
@@ -621,7 +633,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                     <div key={m.branch.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-xs">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color?.primary }} />
-                        <span className="font-semibold text-[#2C2C2C]">{color?.label}</span>
+                        <span className="font-semibold text-[#2C2C2C]">{getBranchDisplayName(m.branch)}</span>
                       </div>
                       <div className="flex items-center gap-3">
                         {m.transfers.pendingOutbound > 0 && (
